@@ -240,6 +240,7 @@ const SUB = {dashboard:'帳戶表現與今日風控一覽', trades:'所有開倉
 const DEFAULTS = {
   brand:'TradeLedger Pro', trader:'', capital:1000, theme:'auto',
   rules:{maxRiskPct:2, maxDailyLoss:50, maxTradesPerDay:5, maxLeverage:20, requireSL:true},
+  feeRate:{open:0, close:0},
   checklist:[
     {id:'c1',text:'符合策略的進場條件'},{id:'c2',text:'已設定止損'},{id:'c3',text:'單筆風險在規則內'},
     {id:'c4',text:'預期盈虧比 ≥ 1.5'},{id:'c5',text:'已確認大週期方向'},{id:'c6',text:'情緒平穩，非追單或報復'}],
@@ -294,11 +295,14 @@ function norm(o){
   const t = {
     id:str(o.id || uid(), 40), coin:str(o.coin, 20).toUpperCase().trim(), dir:o.dir === 'Short' ? 'Short' : 'Long',
     lev:Math.max(1, Math.round(n(o.lev) || 1)), notional:n(o.notional), entry:n(o.entry), exit:n(o.exit), sl:n(o.sl), tp:n(o.tp),
-    fees:n(o.fees) || 0, openAt:str(o.openAt, 16), closeAt:null, exchange:str(o.exchange, 60), strategy:str(o.strategy, 60), tf:str(o.tf, 10),
+    fees:0, feeOpen:0, feeClose:0, funding:0, openAt:str(o.openAt, 16), closeAt:null, exchange:str(o.exchange, 60), strategy:str(o.strategy, 60), tf:str(o.tf, 10),
     emotion:str(o.emotion, 20), rating:Math.min(5, Math.max(0, Math.round(n(o.rating) || 0))),
     checks:Array.isArray(o.checks) ? o.checks.map(x => str(x, 40)) : [], mistakes:Array.isArray(o.mistakes) ? o.mistakes.map(x => str(x, 60)) : [],
-    notes:str(o.notes), review:str(o.review), shot:(typeof o.shot === 'string' && o.shot.startsWith('data:image/')) ? o.shot : null, demo:!!o.demo, updatedAt:Math.max(0, n(o.updatedAt) || 0)
+    notes:str(o.notes), review:str(o.review), shot:(typeof o.shot === 'string' && o.shot.startsWith('data:image/') && o.shot.length <= 700000) ? o.shot : null, demo:!!o.demo, updatedAt:Math.max(0, n(o.updatedAt) || 0)
   };
+  const split = o.feeOpen != null || o.feeClose != null || o.funding != null;
+  if (split) { t.feeOpen = n(o.feeOpen) || 0; t.feeClose = n(o.feeClose) || 0; t.funding = n(o.funding) || 0; t.fees = t.feeOpen + t.feeClose + t.funding; }
+  else { t.feeOpen = n(o.fees) || 0; t.fees = t.feeOpen; }
   if (!t.coin || !(t.entry > 0) || !(t.notional > 0) || !re.test(t.openAt)) return null;
   if (t.exit != null) t.closeAt = re.test(String(o.closeAt)) ? o.closeAt : t.openAt;
   return t;
@@ -643,6 +647,8 @@ function vSettings(){
   return `<div class="grid g2 mb"><div class="card"><h3>品牌與帳戶</h3>
     ${fld('產品 / 品牌名稱', 'brand', s.brand, 'text', 'maxlength="30"')}${fld('交易者名稱', 'trader', s.trader, 'text', 'maxlength="30"')}
     ${fld('起始本金 (USDT)', 'capital', s.capital, 'number', 'min="1" step="any"')}
+    ${fld('開倉手續費率 (%)', 'feeRate.open', s.feeRate.open, 'number', 'min="0" step="0.0001"')}${fld('平倉手續費率 (%)', 'feeRate.close', s.feeRate.close, 'number', 'min="0" step="0.0001"')}
+    <p class="muted" style="font-size:12px;margin:-4px 0 12px">依你在派網帳戶實際適用的費率填寫，只用於表單的「依費率估算」按鈕。</p>
     <div class="field"><label class="fl">主題</label><select data-set="theme" style="width:100%"><option value="auto" ${s.theme === 'auto' ? 'selected' : ''}>跟隨系統</option><option value="light" ${s.theme === 'light' ? 'selected' : ''}>淺色</option><option value="dark" ${s.theme === 'dark' ? 'selected' : ''}>深色</option></select></div></div>
   <div class="card"><h3>風控與紀律規則 <small>違反時會在交易紀錄中標示</small></h3>
     ${fld('單筆最大風險 (% 淨值)', 'rules.maxRiskPct', r.maxRiskPct, 'number', 'min="0.1" step="0.1"')}${fld('單日最大虧損 (USDT)', 'rules.maxDailyLoss', r.maxDailyLoss, 'number', 'min="0" step="any"')}
@@ -661,12 +667,12 @@ function normGrid(o){
   const n = v => { const x = parseFloat(v); return Number.isFinite(x) ? x : null; }, str = (v, l = 2000) => String(v ?? '').slice(0, l), re = /^\d{4}-\d\d-\d\dT\d\d:\d\d$/;
   const g = {id:str(o.id || uid(), 40), coin:str(o.coin, 20).toUpperCase().trim(), kind:o.kind === 'spot' ? 'spot' : 'futures', dir:['Long', 'Short', 'Neutral'].includes(o.dir) ? o.dir : 'Neutral',
     lev:Math.max(1, Math.round(n(o.lev) || 1)), low:n(o.low), high:n(o.high), grids:Math.max(0, Math.round(n(o.grids) || 0)), invest:n(o.invest),
-    gridProfit:n(o.gridProfit) || 0, posPnl:n(o.posPnl) || 0, fees:n(o.fees) || 0, startAt:str(o.startAt, 16), endAt:re.test(String(o.endAt)) ? o.endAt : null, notes:str(o.notes), demo:!!o.demo, updatedAt:Math.max(0, n(o.updatedAt) || 0)};
+    gridProfit:n(o.gridProfit) || 0, posPnl:n(o.posPnl) || 0, fees:n(o.fees) || 0, funding:n(o.funding) || 0, startAt:str(o.startAt, 16), endAt:re.test(String(o.endAt)) ? o.endAt : null, notes:str(o.notes), demo:!!o.demo, updatedAt:Math.max(0, n(o.updatedAt) || 0)};
   if (!g.coin || !(g.invest > 0) || !re.test(g.startAt)) return null;
   return g;
 }
 function calcGrid(g){
-  const net = g.gridProfit + g.posPnl - g.fees, roi = g.invest > 0 ? net / g.invest : null;
+  const net = g.gridProfit + g.posPnl - g.fees - (g.funding || 0), roi = g.invest > 0 ? net / g.invest : null;
   const end = g.endAt ? new Date(g.endAt) : new Date(), days = Math.max((end - new Date(g.startAt)) / 864e5, 0);
   const apr = (roi != null && days >= 1) ? roi / days * 365 : null;
   const width = (g.low > 0 && g.high > g.low) ? (g.high - g.low) / g.low : null, step = (width != null && g.grids > 0) ? width / g.grids : null;
@@ -682,7 +688,7 @@ function demoGrids(){
 function vGrid(){
   if (!S.grids.length) return `<div class="card hero-note"><h2>網格機器人紀錄</h2><p>網格的賺錢方式和手動合約不同，所以這裡獨立記帳：記下價格區間、格數、投入與套利收益，追蹤報酬率與年化。</p><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn primary" data-act="new">新增網格</button><button class="btn" data-act="demo">載入範例資料</button></div></div>`;
   const C = [...S.grids].sort((a, b) => a.startAt < b.startAt ? 1 : -1).map(g => ({g, c:calcGrid(g)})), L = C.map(x => x.g);
-  const tot = sum(L.map(g => g.invest)), net = sum(C.map(x => x.c.net)), gp = sum(L.map(g => g.gridProfit)), pp = sum(L.map(g => g.posPnl)), fees = sum(L.map(g => g.fees));
+  const tot = sum(L.map(g => g.invest)), net = sum(C.map(x => x.c.net)), gp = sum(L.map(g => g.gridProfit)), pp = sum(L.map(g => g.posPnl)), fees = sum(L.map(g => g.fees + g.funding));
   const run = L.filter(g => !g.endAt).length, done = C.filter(x => x.g.endAt), wins = done.filter(x => x.c.net > 0).length;
   const aprs = done.map(x => x.c.apr).filter(x => x != null), avgApr = aprs.length ? sum(aprs) / aprs.length : null;
   const byCoin = {}; C.forEach(x => { byCoin[x.g.coin] = (byCoin[x.g.coin] || 0) + x.c.net; });
@@ -696,7 +702,7 @@ function vGrid(){
   const rows = C.map(({g, c}) => `<tr data-act="gedit" data-id="${g.id}"><td class="num">${fmtDT(g.startAt)}<small>${g.endAt ? '→ ' + fmtDT(g.endAt) : ''}</small></td>
     <td><b>${esc(g.coin)}</b> <span class="tag">${GKIND[g.kind]}</span><small>${GDIR[g.dir]}${g.kind === 'futures' ? ' · ' + g.lev + 'X' : ''}</small></td>
     <td class="r num">${g.low != null && g.high != null ? price(g.low) + ' – ' + price(g.high) : '—'}<small>${g.grids ? g.grids + ' 格' : ''}${c.step != null ? ' · 每格 ' + pct(c.step, 2) : ''}</small></td>
-    <td class="r num">$${fmt(g.invest)}</td><td class="r num ${sgn(g.gridProfit)}">${money(g.gridProfit)}</td><td class="r num ${sgn(g.posPnl)}">${money(g.posPnl)}</td><td class="r num">${usd(g.fees)}</td>
+    <td class="r num">$${fmt(g.invest)}</td><td class="r num ${sgn(g.gridProfit)}">${money(g.gridProfit)}</td><td class="r num ${sgn(g.posPnl)}">${money(g.posPnl)}</td><td class="r num">${usd(g.fees + g.funding)}</td>
     <td class="r num ${sgn(c.net)}"><b>${money(c.net)}</b><small>${pct(c.roi)}</small></td><td class="r num">${c.apr != null ? pct(c.apr, 0) : '—'}<small>${fmt(c.days, 1)} 天</small></td>
     <td>${g.endAt ? '<span class="tag">已結束</span>' : '<span class="tag open">運行中</span>'}</td><td class="r" style="white-space:nowrap"><button class="btn sm danger" data-act="gdel" data-id="${g.id}">刪除</button></td></tr>`).join('');
   return `<div class="alert info"><div><b>獨立記帳</b>網格績效不計入合約的帳戶淨值與統計，避免兩種策略的數字混在一起。</div></div>
@@ -717,7 +723,8 @@ function openGridForm(id){
       <div class="row3">${field('槓桿 (X)', 'g_lev', g.lev, 'number', 'min="1" step="1"')}${field('價格下限', 'g_low', g.low, 'number', 'min="0" step="any"')}${field('價格上限', 'g_high', g.high, 'number', 'min="0" step="any"')}</div>
       <div class="row3">${field('格數', 'g_n', g.grids, 'number', 'min="0" step="1"')}${field('投入本金 (USDT)', 'g_inv', g.invest, 'number', 'min="0" step="any"')}${field('開始時間', 'g_start', g.startAt, 'datetime-local')}</div>
       ${field('結束時間（留空 = 運行中）', 'g_end', g.endAt || '', 'datetime-local')}</div>
-    <div class="fs"><h4>損益</h4><div class="row3">${field('套利收益', 'g_gp', g.gridProfit, 'number', 'step="any"')}${field('持倉盈虧', 'g_pp', g.posPnl, 'number', 'step="any"')}${field('手續費 + 資金費', 'g_fee', g.fees, 'number', 'min="0" step="any"')}</div></div>
+    <div class="fs"><h4>損益</h4><div class="row3">${field('套利收益', 'g_gp', g.gridProfit, 'number', 'step="any"')}${field('持倉盈虧', 'g_pp', g.posPnl, 'number', 'step="any"')}${field('手續費', 'g_fee', g.fees, 'number', 'min="0" step="any"')}</div>
+    <div class="row3">${field('資金費（付出填正、收到填負）', 'g_fund', g.funding ?? 0, 'number', 'step="any"')}</div></div>
     <div class="fs"><h4>筆記</h4><textarea id="g_notes" maxlength="2000">${esc(g.notes)}</textarea></div>
   </div><div><div class="pv" id="gpv"></div></div></div></div>
   <div class="df"><span id="gerr" class="neg" style="margin-right:auto;align-self:center"></span><button type="button" class="btn" data-act="close">取消</button><button type="submit" class="btn primary">${id ? '儲存變更' : '記錄網格'}</button></div></form>
@@ -727,7 +734,7 @@ function openGridForm(id){
 function readGrid(){
   const g = id => $('#' + id).value;
   return {id:FORM.gridId || uid(), kind:g('g_kind'), dir:$('input[name=g_dir]:checked').value, coin:g('g_coin').trim().toUpperCase(), lev:Math.round(num(g('g_lev')) || 1), low:num(g('g_low')), high:num(g('g_high')),
-    grids:Math.round(num(g('g_n')) || 0), invest:num(g('g_inv')), startAt:g('g_start'), endAt:g('g_end') || null, gridProfit:num(g('g_gp')) || 0, posPnl:num(g('g_pp')) || 0, fees:num(g('g_fee')) || 0, notes:g('g_notes').trim()};
+    grids:Math.round(num(g('g_n')) || 0), invest:num(g('g_inv')), startAt:g('g_start'), endAt:g('g_end') || null, gridProfit:num(g('g_gp')) || 0, posPnl:num(g('g_pp')) || 0, fees:num(g('g_fee')) || 0, funding:num(g('g_fund')) || 0, notes:g('g_notes').trim()};
 }
 function updateGP(){
   const pv = $('#gpv'); if (!pv) return; const g = readGrid();
@@ -764,12 +771,15 @@ function openForm(id, preset){
     <div class="fs"><h4>基本資料</h4>
       <div class="row2"><div class="field"><label class="fl">方向</label><div class="seg"><label><input type="radio" name="f_dir" value="Long" ${t.dir === 'Long' ? 'checked' : ''}><span>多頭 Long</span></label><label><input type="radio" name="f_dir" value="Short" ${t.dir === 'Short' ? 'checked' : ''}><span>空頭 Short</span></label></div></div>
       ${field('幣種', 'f_coin', t.coin, 'text', 'list="dl_coin" placeholder="BTC" autocomplete="off" maxlength="20"')}</div>
-      <div class="row3">${field('槓桿 (X)', 'f_lev', t.lev, 'number', 'min="1" step="1"')}${field('倉位價值 (USDT)', 'f_notional', t.notional, 'number', 'min="0" step="any" placeholder="1000"')}${field('手續費 + 資金費 (USDT)', 'f_fees', t.fees ?? 0, 'number', 'min="0" step="any"')}</div>
+      <div class="row2">${field('槓桿 (X)', 'f_lev', t.lev, 'number', 'min="1" step="1"')}${field('倉位價值 (USDT)', 'f_notional', t.notional, 'number', 'min="0" step="any" placeholder="1000"')}</div>
       <div class="row3">${field('平台', 'f_ex', t.exchange, 'text', 'list="dl_ex" maxlength="60"')}${field('策略', 'f_str', t.strategy, 'text', 'list="dl_str" maxlength="60"')}
       <div class="field"><label class="fl" for="f_tf">交易週期</label><select id="f_tf" style="width:100%"><option value="">未填</option>${TFS.map(x => `<option ${t.tf === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div></div></div>
     <div class="fs"><h4>價格與時間 <span class="muted" style="font-weight:400">· 平倉價留空 = 持倉中</span></h4>
       <div class="row3">${field('開倉價', 'f_entry', t.entry, 'number', 'min="0" step="any"')}${field('止損價', 'f_sl', t.sl, 'number', 'min="0" step="any"')}${field('止盈價', 'f_tp', t.tp, 'number', 'min="0" step="any"')}</div>
       <div class="row3">${field('平倉價', 'f_exit', t.exit, 'number', 'min="0" step="any"')}${field('開倉時間', 'f_open', t.openAt, 'datetime-local')}${field('平倉時間', 'f_close', t.closeAt || '', 'datetime-local')}</div></div>
+    <div class="fs"><h4>費用 <span class="muted" style="font-weight:400">· 開、平倉各收一次手續費，另有資金費</span> <button type="button" class="btn sm" data-act="feeest" style="float:right">依費率估算</button></h4>
+      <div class="row3">${field('開倉手續費 (USDT)', 'f_feeo', t.feeOpen ?? 0, 'number', 'min="0" step="any"')}${field('平倉手續費 (USDT)', 'f_feec', t.feeClose ?? 0, 'number', 'min="0" step="any"')}${field('資金費 (USDT)', 'f_fund', t.funding ?? 0, 'number', 'step="any"')}</div>
+      <p class="muted" style="font-size:12px">資金費：付出填正數，收到填負數。費率可在「設定」填入，供「依費率估算」使用。</p></div>
     <div class="fs"><h4>進場前檢查清單</h4>${s.checklist.map(i => `<label class="chk"><input type="checkbox" class="f_chk" value="${i.id}" ${t.checks.includes(i.id) ? 'checked' : ''}><span>${esc(i.text)}</span></label>`).join('') || '<p class="muted">尚未設定清單，可至設定頁新增</p>'}</div>
     <div class="fs"><h4>執行品質</h4>
       <div class="row2"><div class="field"><label class="fl" for="f_emo">交易時情緒</label><select id="f_emo" style="width:100%">${EMOTIONS.map(x => `<option ${t.emotion === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
@@ -787,7 +797,7 @@ function openForm(id, preset){
 function readForm(){
   const g = id => $('#' + id).value, exit = num(g('f_exit'));
   return {id:FORM.editId || uid(), coin:g('f_coin').trim().toUpperCase(), dir:$('input[name=f_dir]:checked').value, lev:Math.round(num(g('f_lev')) || 0), notional:num(g('f_notional')),
-    entry:num(g('f_entry')), exit, sl:num(g('f_sl')), tp:num(g('f_tp')), fees:num(g('f_fees')) || 0, openAt:g('f_open'), closeAt:exit != null ? (g('f_close') || nowLocal()) : null,
+    entry:num(g('f_entry')), exit, sl:num(g('f_sl')), tp:num(g('f_tp')), feeOpen:num(g('f_feeo')) || 0, feeClose:num(g('f_feec')) || 0, funding:num(g('f_fund')) || 0, fees:(num(g('f_feeo')) || 0) + (num(g('f_feec')) || 0) + (num(g('f_fund')) || 0), openAt:g('f_open'), closeAt:exit != null ? (g('f_close') || nowLocal()) : null,
     exchange:g('f_ex').trim(), strategy:g('f_str').trim(), tf:g('f_tf'), emotion:g('f_emo'), rating:+g('f_rate'), checks:$$('.f_chk:checked').map(x => x.value), mistakes:$$('.f_mis:checked').map(x => x.value),
     notes:g('f_notes').trim(), review:g('f_rev').trim(), shot:FORM.shot};
 }
@@ -807,7 +817,7 @@ function updatePV(){
   pv.innerHTML = `<h4>${c.net != null ? '實際淨盈虧' : '即時試算'}</h4>${head}<dl>
     <dt>合約數量</dt><dd>${fmt(c.size, 4)}</dd><dt>保證金</dt><dd>$${fmt(c.margin)}</dd><dt>估算強平價</dt><dd>${price(c.liq)}</dd>
     <dt>止損風險</dt><dd>${c.risk != null ? usd(c.risk) + ' (' + fmt(c.risk / eq * 100, 2) + '%)' : '未設定'}</dd><dt>預期盈虧比</dt><dd>${c.rr != null ? fmt(c.rr, 2) : '—'}</dd>
-    ${c.net != null ? `<dt>毛盈虧</dt><dd class="${sgn(c.gross)}">${money(c.gross)}</dd><dt>R 倍數</dt><dd class="${sgn(c.R)}">${c.R != null ? fmt(c.R, 2) + 'R' : '—'}</dd><dt>保證金報酬率</dt><dd class="${sgn(c.roi)}">${pct(c.roi)}</dd>` : ''}</dl>
+    ${c.net != null ? `<dt>費用合計</dt><dd>${usd(t.fees)}</dd><dt>毛盈虧</dt><dd class="${sgn(c.gross)}">${money(c.gross)}</dd><dt>R 倍數</dt><dd class="${sgn(c.R)}">${c.R != null ? fmt(c.R, 2) + 'R' : '—'}</dd><dt>保證金報酬率</dt><dd class="${sgn(c.roi)}">${pct(c.roi)}</dd>` : ''}</dl>
     ${warns.length ? `<ul>${warns.map(w => `<li class="${w[0]}">${esc(w[1])}</li>`).join('')}</ul>` : ''}`;
 }
 async function submitForm(e){
@@ -842,7 +852,7 @@ function openDetail(id){
     <div><span>淨盈虧</span><b class="${sgn(d.net)}">${d.net != null ? money(d.net) : '持倉中'}</b></div><div><span>R 倍數</span><b class="${sgn(d.R)}">${d.R != null ? fmt(d.R, 2) + 'R' : '—'}</b></div>
     <div><span>保證金報酬率</span><b class="${sgn(d.roi)}">${pct(d.roi)}</b></div><div><span>持倉時間</span><b>${fmtDur(d.hold)}</b></div>
     <div><span>倉位價值 / 數量</span><b>$${fmt(t.notional)} / ${fmt(d.size, 4)}</b></div><div><span>開倉 → 平倉</span><b>${price(t.entry)} → ${price(t.exit)}</b></div>
-    <div><span>止損 / 止盈</span><b>${price(t.sl)} / ${price(t.tp)}</b></div><div><span>手續費與資金費</span><b>${usd(t.fees)}</b></div>
+    <div><span>止損 / 止盈</span><b>${price(t.sl)} / ${price(t.tp)}</b></div><div><span>開 / 平倉手續費</span><b>${usd(t.feeOpen)} / ${usd(t.feeClose)}</b></div><div><span>資金費</span><b>${usd(t.funding)}</b></div>
     <div><span>風險金額</span><b>${d.risk != null ? usd(d.risk) + ' (' + fmt(d.risk / d.eq * 100, 2) + '%)' : '未設定'}</b></div><div><span>預期盈虧比</span><b>${d.rr != null ? fmt(d.rr, 2) : '—'}</b></div>
     <div><span>平台 / 策略</span><b>${esc(t.exchange) || '—'} / ${esc(t.strategy) || '—'}</b></div><div><span>週期 / 情緒 / 評分</span><b>${esc(t.tf) || '—'} / ${esc(t.emotion) || '—'} / ${t.rating ? '★'.repeat(t.rating) : '—'}</b></div>
     <div><span>開倉時間</span><b>${fmtDT(t.openAt)}</b></div><div><span>平倉時間</span><b>${fmtDT(t.closeAt)}</b></div></div>
@@ -855,12 +865,12 @@ function openDetail(id){
 
 /* ============ data actions ============ */
 function csvExport(){
-  const head = ['狀態','幣種','方向','槓桿','倉位價值','數量','開倉價','平倉價','止損','止盈','費用','毛盈虧','淨盈虧','保證金報酬率','R倍數','開倉時間','平倉時間','平台','策略','週期','情緒','評分','錯誤標籤','違規','清單完成率','進場計畫','復盤'];
+  const head = ['狀態','幣種','方向','槓桿','倉位價值','數量','開倉價','平倉價','止損','止盈','開倉手續費','平倉手續費','資金費','費用合計','毛盈虧','淨盈虧','保證金報酬率','R倍數','開倉時間','平倉時間','平台','策略','週期','情緒','評分','錯誤標籤','違規','清單完成率','進場計畫','復盤'];
   const q = v => { const s = String(v ?? ''); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const tx = v => { const s = String(v ?? ''); return /^[=+\-@\t\r]/.test(s) ? "'" + s : s; };
   const r = (n, d = 4) => n == null ? '' : +n.toFixed(d);
   const rows = [...S.trades].sort((a, b) => a.openAt < b.openAt ? -1 : 1).map(t => { const d = S.D[t.id];
-    return [t.exit == null ? '持倉中' : '已平倉', tx(t.coin), t.dir, t.lev, t.notional, r(d.size, 6), t.entry, t.exit ?? '', t.sl ?? '', t.tp ?? '', t.fees, r(d.gross, 4), r(d.net, 4), r(d.roi, 4), r(d.R, 3), t.openAt, t.closeAt ?? '', tx(t.exchange), tx(t.strategy), t.tf, t.emotion, t.rating || '', tx(t.mistakes.join('|')), tx(d.viol.map(v => v.msg).join('|')), d.chk != null ? r(d.chk, 2) : '', tx(t.notes), tx(t.review)].map(q).join(','); });
+    return [t.exit == null ? '持倉中' : '已平倉', tx(t.coin), t.dir, t.lev, t.notional, r(d.size, 6), t.entry, t.exit ?? '', t.sl ?? '', t.tp ?? '', t.feeOpen, t.feeClose, t.funding, t.fees, r(d.gross, 4), r(d.net, 4), r(d.roi, 4), r(d.R, 3), t.openAt, t.closeAt ?? '', tx(t.exchange), tx(t.strategy), t.tf, t.emotion, t.rating || '', tx(t.mistakes.join('|')), tx(d.viol.map(v => v.msg).join('|')), d.chk != null ? r(d.chk, 2) : '', tx(t.notes), tx(t.review)].map(q).join(','); });
   download('\ufeff' + head.join(',') + '\r\n' + rows.join('\r\n'), `trades-${today()}.csv`, 'text/csv;charset=utf-8');
   toast('已匯出 CSV');
 }
@@ -881,9 +891,19 @@ async function jsonImport(file){
   } catch (e) { toast('匯入失敗：檔案格式不正確'); }
 }
 function mergeSettings(o){
-  const d = JSON.parse(JSON.stringify(DEFAULTS)), s = {...d, ...o, rules:{...d.rules, ...(o.rules || {})}};
-  ['checklist','mistakes','strategies','exchanges'].forEach(k => { if (!Array.isArray(s[k])) s[k] = d[k]; });
-  s.capital = num(s.capital) > 0 ? num(s.capital) : d.capital; return s;
+  o = (o && typeof o === 'object') ? o : {};
+  const d = JSON.parse(JSON.stringify(DEFAULTS)), s = {};
+  const pn = (v, dv, min = 0, max = 1e12) => { const x = num(v); return (x != null && x >= min && x <= max) ? x : dv; };
+  s.brand = String(o.brand ?? d.brand).slice(0, 30) || d.brand; s.trader = String(o.trader ?? '').slice(0, 30);
+  s.capital = pn(o.capital, d.capital, 1); s.theme = ['auto', 'light', 'dark'].includes(o.theme) ? o.theme : 'auto';
+  const r = o.rules || {};
+  s.rules = {maxRiskPct:pn(r.maxRiskPct, d.rules.maxRiskPct, 0, 100), maxDailyLoss:pn(r.maxDailyLoss, d.rules.maxDailyLoss), maxTradesPerDay:pn(r.maxTradesPerDay, d.rules.maxTradesPerDay, 0, 1000),
+    maxLeverage:pn(r.maxLeverage, d.rules.maxLeverage, 1, 1000), requireSL:r.requireSL === undefined ? d.rules.requireSL : !!r.requireSL};
+  const fr = o.feeRate || {}; s.feeRate = {open:pn(fr.open, 0, 0, 100), close:pn(fr.close, 0, 0, 100)};
+  const strs = (a, dv) => Array.isArray(a) ? a.map(x => String(x ?? '').slice(0, 60)).filter(Boolean).slice(0, 50) : dv;
+  s.checklist = Array.isArray(o.checklist) ? o.checklist.filter(x => x && x.id && x.text).map(x => ({id:String(x.id).slice(0, 40), text:String(x.text).slice(0, 60)})).slice(0, 50) : d.checklist;
+  s.mistakes = strs(o.mistakes, d.mistakes); s.strategies = strs(o.strategies, d.strategies); s.exchanges = strs(o.exchanges, d.exchanges);
+  return s;
 }
 function demoTrades(){
   let seed = 20260101; const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -899,7 +919,7 @@ function demoTrades(){
     const open = new Date(start + i * (80 / 88) * 864e5 + rnd() * 20 * 36e5), hold = .3 + rnd() * 30, close = new Date(open.getTime() + hold * 36e5);
     if (close > new Date()) continue;
     out.push({id:uid(), demo:true, coin, dir, lev, notional, entry, sl:P(entry * (1 - d * slPct)), tp:P(entry * (1 + d * slPct * rr)), exit:P(entry * (1 + d * slPct * R)),
-      fees:+(notional * .0011 + (hold > 8 ? notional * .0001 * Math.floor(hold / 8) : 0)).toFixed(2), openAt:toLocal(open), closeAt:toLocal(close), exchange:pick(s.exchanges), strategy:pick(s.strategies), tf:pick(['15m', '1h', '4h']),
+      feeOpen:+(notional * .00055).toFixed(2), feeClose:+(notional * .00055).toFixed(2), funding:+(hold > 8 ? notional * .0001 * Math.floor(hold / 8) : 0).toFixed(2), openAt:toLocal(open), closeAt:toLocal(close), exchange:pick(s.exchanges), strategy:pick(s.strategies), tf:pick(['15m', '1h', '4h']),
       emotion:bad ? pick(['FOMO', '貪婪', '恐懼', '報復', '疲憊']) : pick(['冷靜', '冷靜', '自信', '猶豫']), rating:bad ? 1 + Math.floor(rnd() * 2) : 3 + Math.floor(rnd() * 3),
       checks:bad ? s.checklist.filter(() => rnd() < .5).map(x => x.id) : s.checklist.map(x => x.id), mistakes:bad ? [pick(s.mistakes)] : [],
       notes:bad ? '情緒化進場，沒有等收線確認。' : '依計畫進場，止損放在結構低點下方，目標為前高。', review:bad ? '重點是等訊號出現再動手，不要追價。' : (win ? '執行到位，按計畫出場。' : '止損出場，單純的成本，不需自責。')});
@@ -912,7 +932,7 @@ function demoTrades(){
 const ACT = {
   new:() => S.view === 'grid' ? openGridForm() : openForm(), gedit:(el, id) => openGridForm(id),
   gdel:async (el, id) => { if (!(await confirmBox('刪除這個網格紀錄？', '刪除後無法復原。', '刪除', true))) return; S.grids = S.grids.filter(x => x.id !== id); await saveGrids(); render(); toast('已刪除'); }, close:() => closeModal(), view:(el, id) => openDetail(id), edit:(el, id) => { openForm(id); },
-  dup:(el, id) => { const t = S.trades.find(x => x.id === id); openForm(null, {...t, id:null, exit:null, closeAt:null, openAt:nowLocal(), review:'', shot:null, mistakes:[], checks:[], rating:0, fees:0, demo:false}); },
+  dup:(el, id) => { const t = S.trades.find(x => x.id === id); openForm(null, {...t, id:null, exit:null, closeAt:null, openAt:nowLocal(), review:'', shot:null, mistakes:[], checks:[], rating:0, fees:0, feeOpen:0, feeClose:0, funding:0, demo:false}); },
   del:async (el, id) => {
     if (!(await confirmBox('刪除這筆交易？', '刪除後無法復原。', '刪除', true))) return;
     S.trades = S.trades.filter(x => x.id !== id); await persist(() => IDB.del(id)); recompute(); closeModal(); render(); toast('已刪除');
@@ -922,6 +942,14 @@ const ACT = {
   calprev:() => { S.cal = new Date(S.cal.getFullYear(), S.cal.getMonth() - 1, 1); render(); },
   calnext:() => { S.cal = new Date(S.cal.getFullYear(), S.cal.getMonth() + 1, 1); render(); },
   caltoday:() => { S.cal = new Date(); render(); },
+  feeest:() => {
+    const r = S.settings.feeRate || {open:0, close:0};
+    if (!(r.open > 0 || r.close > 0)) { toast('請先到設定填入手續費率'); return; }
+    const t = readForm(); if (!(t.notional > 0) || !(t.entry > 0)) { toast('請先填入倉位價值與開倉價'); return; }
+    $('#f_feeo').value = +(t.notional * r.open / 100).toFixed(4);
+    if (t.exit != null) $('#f_feec').value = +(t.notional / t.entry * t.exit * r.close / 100).toFixed(4); else toast('填入平倉價後可估算平倉手續費');
+    updatePV();
+  },
   cloud:openCloud, syncnow:() => { scheduleSync(0); toast('開始同步'); },
   amode:() => { FB.mode = FB.mode === 'signup' ? 'signin' : 'signup'; openCloud(); },
   google:async () => { try { await FB.A.signInWithPopup(FB.auth, new FB.A.GoogleAuthProvider()); closeModal(); toast('登入成功，正在同步'); } catch (e) { const el = $('#aerr'); if (el) el.textContent = authMsg(e); } },
