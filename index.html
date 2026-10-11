@@ -1,636 +1,1174 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>清廉選戰：雲端協作記帳系統</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React & ReactDOM -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel for JSX -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@0.321.0"></script>
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
-        body { font-family: 'Noto Sans TC', sans-serif; }
-        @media print {
-            body { background-color: white; }
-            .print-hidden { display: none !important; }
-            .print-full-width { width: 100% !important; max-width: 100% !important; grid-column: span 12 / span 12 !important; }
-            .print-shadow-none { box-shadow: none !important; border: none !important; }
-            .print-break-inside-avoid { break-inside: avoid; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TradeLedger Pro · 合約交易日誌</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#eef1f5;--panel:#ffffff;--panel2:#f5f7fa;--text:#111a2c;--muted:#66728a;--line:#dfe5ee;--line2:#eceff5;
+  --accent:#2457d6;--accent2:rgba(36,87,214,.09);--pos:#0c8f5a;--neg:#cf3a2f;--warn:#b7791f;
+  --posbg:rgba(12,143,90,.11);--negbg:rgba(207,58,47,.11);--warnbg:rgba(183,121,31,.13);
+  --shadow:0 1px 0 rgba(17,26,44,.04),0 10px 30px -12px rgba(17,26,44,.14);
+  --font:"Noto Sans TC","PingFang TC","Microsoft JhengHei","Segoe UI",system-ui,-apple-system,sans-serif;
+}
+[data-theme=dark]{
+  --bg:#0b1220;--panel:#111b2e;--panel2:#0e1728;--text:#e6ecf7;--muted:#8794ae;--line:#223051;--line2:#1a2641;
+  --accent:#7ba3ff;--accent2:rgba(123,163,255,.13);--pos:#3fd49b;--neg:#ff7b70;--warn:#f0b957;
+  --posbg:rgba(63,212,155,.13);--negbg:rgba(255,123,112,.14);--warnbg:rgba(240,185,87,.14);
+  --shadow:0 1px 0 rgba(255,255,255,.03),0 14px 34px -14px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num,td,.kpi b,.hero-eq{font-variant-numeric:tabular-nums}
+.pos{color:var(--pos)}.neg{color:var(--neg)}.muted{color:var(--muted)}.warn{color:var(--warn)}
+.app{display:grid;grid-template-columns:236px 1fr;min-height:100%}
+.side{position:sticky;top:0;height:100vh;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:22px 14px}
+.brand{display:flex;gap:11px;align-items:center;padding:0 8px 22px}
+.logo{width:34px;height:34px;border-radius:9px;background:var(--text);color:var(--panel);display:grid;place-items:center;font-weight:800;font-size:15px;letter-spacing:-1px}
+.brand b{display:block;font-size:15px;line-height:1.2}.brand small{color:var(--muted);font-size:12px}
+.nav button{display:flex;gap:11px;align-items:center;width:100%;padding:10px 12px;border:0;background:none;border-radius:9px;color:var(--muted);cursor:pointer;text-align:left;font-weight:500;margin-bottom:2px}
+.nav button:hover{background:var(--panel2);color:var(--text)}
+.nav button.on{background:var(--accent2);color:var(--accent);font-weight:700}
+.side-foot{margin-top:auto;padding:14px 10px;border-top:1px solid var(--line)}
+.side-foot span{font-size:12px;color:var(--muted);display:block}.side-foot b{font-size:19px}
+main{padding:26px 32px 90px;min-width:0;max-width:1480px;width:100%}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.top h1{font-size:24px;letter-spacing:-.3px}.top p{color:var(--muted);font-size:13px}
+.top-r{display:flex;gap:8px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--panel);padding:8px 14px;border-radius:9px;cursor:pointer;font-weight:600;transition:.15s;white-space:nowrap}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.1);color:#fff}
+.btn.danger{color:var(--neg)}.btn.danger:hover{border-color:var(--neg);color:var(--neg)}
+.btn.sm{padding:5px 10px;font-size:12.5px}.btn.icon{padding:8px 11px}
+select,input[type=text],input[type=number],input[type=datetime-local],input[type=password],textarea{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 10px;width:100%;min-width:0}
+select{width:auto}
+textarea{resize:vertical;min-height:70px}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;box-shadow:var(--shadow)}
+.card h3{font-size:14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.card h3 small{color:var(--muted);font-weight:400;font-size:12px}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g21{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.mb{margin-bottom:16px}
+.chart{position:relative;height:250px}.chart.tall{height:300px}.chart.sm{height:200px}
+.empty{padding:34px 12px;text-align:center;color:var(--muted)}
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:0;padding:0;overflow:hidden}
+.hero-l{padding:22px 24px 8px;position:relative}
+.hero-l small{color:var(--muted)}
+.hero-eq{font-size:40px;font-weight:800;letter-spacing:-1.5px;line-height:1.1;margin:4px 0 4px}
+.hero-sub{font-size:13px}
+.hero .chart{height:150px;margin:6px -2px 0}
+.hero-r{border-left:1px solid var(--line);padding:22px 24px;display:flex;gap:20px;align-items:center}
+.ring{width:118px;height:118px;flex:none;position:relative}
+.ring svg{transform:rotate(-90deg)}
+.ring div{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.ring b{font-size:26px;line-height:1}.ring span{font-size:11px;color:var(--muted)}
+.hero-r ul{list-style:none;padding:0;font-size:13px;display:grid;gap:7px;min-width:0}
+.hero-r li{display:flex;justify-content:space-between;gap:12px}
+/* kpi strip */
+.strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.kpi{padding:14px 18px;border-right:1px solid var(--line2);border-bottom:1px solid var(--line2)}
+.kpi:nth-child(4n){border-right:0}.kpi:nth-last-child(-n+4){border-bottom:0}
+.kpi span{font-size:12.5px;color:var(--muted)}.kpi b{display:block;font-size:21px;letter-spacing:-.4px;margin-top:1px}.kpi small{color:var(--muted);font-size:12px}
+/* alerts */
+.alert{display:flex;gap:10px;align-items:flex-start;padding:11px 14px;border-radius:10px;margin-bottom:10px;font-size:13.5px}
+.alert.bad{background:var(--negbg);color:var(--neg)}.alert.warn{background:var(--warnbg);color:var(--warn)}.alert.info{background:var(--accent2);color:var(--accent)}
+.alert b{font-weight:700}
+/* table */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel);box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;min-width:900px}
+th{font-size:12px;color:var(--muted);font-weight:600;text-align:left;padding:10px 12px;background:var(--panel2);border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 12px;border-bottom:1px solid var(--line2);vertical-align:middle;font-size:13.5px}
+tbody tr{cursor:pointer}tbody tr:hover td{background:var(--panel2)}
+tr:last-child td{border-bottom:0}
+.r{text-align:right}.c{text-align:center}
+td small{display:block;color:var(--muted);font-size:12px}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600;background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+.tag.long{background:var(--posbg);color:var(--pos);border-color:transparent}.tag.short{background:var(--negbg);color:var(--neg);border-color:transparent}
+.tag.ok{background:var(--posbg);color:var(--pos);border-color:transparent}.tag.bad{background:var(--negbg);color:var(--neg);border-color:transparent}.tag.open{background:var(--accent2);color:var(--accent);border-color:transparent}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.toolbar input[type=text]{width:220px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:none;padding:7px 13px;cursor:pointer;color:var(--muted);font-weight:600}
+.seg button.on{background:var(--accent);color:#fff}
+.seg label{padding:8px 16px;cursor:pointer;color:var(--muted);font-weight:700}
+.seg input{display:none}.seg input:checked+span{color:#fff}
+.seg label:has(input:checked){background:var(--accent);color:#fff}
+.seg label:has(input[value=Long]:checked){background:var(--pos)}.seg label:has(input[value=Short]:checked){background:var(--neg)}
+/* progress */
+.bar{height:7px;background:var(--line2);border-radius:9px;overflow:hidden;margin-top:5px}.bar i{display:block;height:100%;background:var(--accent);border-radius:9px}
+.bar i.bad{background:var(--neg)}.bar i.warn{background:var(--warn)}.bar i.ok{background:var(--pos)}
+.meter{margin-bottom:14px}.meter div{display:flex;justify-content:space-between;font-size:13px}
+/* calendar */
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr)) minmax(70px,.9fr);gap:6px}
+.cal .h{font-size:12px;color:var(--muted);text-align:center;padding:4px}
+.cell{min-height:78px;border:1px solid var(--line2);border-radius:9px;padding:6px 8px;background:var(--panel2);font-size:12px;cursor:default}
+.cell.has{cursor:pointer}.cell.has:hover{border-color:var(--accent)}
+.cell .d{color:var(--muted)}.cell b{display:block;font-size:14px;margin-top:6px}
+.cell.wk{background:transparent;border-style:dashed}
+.cell.today{border-color:var(--accent)}
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(7,12,24,.55);display:none;align-items:flex-start;justify-content:center;padding:4vh 14px;z-index:50;overflow-y:auto;backdrop-filter:blur(2px)}
+.overlay.show{display:flex}.overlay.top{z-index:80;align-items:center}
+.dlg{background:var(--panel);border-radius:14px;border:1px solid var(--line);width:100%;max-width:960px;box-shadow:0 30px 80px -20px rgba(0,0,0,.5);animation:pop .16s ease-out}
+.dlg.sm{max-width:400px;padding:22px}.dlg.sm h3{margin-bottom:6px;font-size:17px}.dlg.sm p{color:var(--muted);margin-bottom:18px}
+.dlg.sm .row{display:flex;gap:8px;justify-content:flex-end}
+@keyframes pop{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.dlg{animation:none}}
+.dh{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;border-bottom:1px solid var(--line)}
+.dh h2{font-size:17px}
+.db{padding:20px 22px}
+.df{padding:14px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;position:sticky;bottom:0;background:var(--panel);border-radius:0 0 14px 14px}
+.fgrid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:22px}
+.fs{margin-bottom:20px}.fs>h4{font-size:13px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--line2)}
+.row2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.fl{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px;font-weight:500}
+.fl+*{margin-bottom:0}
+.field{margin-bottom:10px}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border:1px solid var(--line);border-radius:99px;cursor:pointer;font-size:13px;background:var(--panel)}
+.chip input{display:none}.chip:has(input:checked){background:var(--accent2);border-color:var(--accent);color:var(--accent);font-weight:600}
+.chip.mis:has(input:checked){background:var(--negbg);border-color:var(--neg);color:var(--neg)}
+.chip .x{cursor:pointer;color:var(--muted);font-weight:700}.chip .x:hover{color:var(--neg)}
+.chk{display:flex;gap:9px;align-items:center;padding:7px 0;cursor:pointer}.chk input{width:17px;height:17px;accent-color:var(--accent)}
+.pv{position:sticky;top:0;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:16px}
+.pv h4{font-size:13px;margin-bottom:10px}
+.pv dl{display:grid;grid-template-columns:auto auto;gap:7px 10px;font-size:13px}.pv dt{color:var(--muted)}.pv dd{text-align:right;font-weight:600}
+.pv .big{font-size:24px;font-weight:800;letter-spacing:-.6px;margin:2px 0 12px}
+.pv ul{list-style:none;padding:0;margin-top:12px;display:grid;gap:6px;font-size:12.5px}
+.pv li{padding:7px 10px;border-radius:8px}.pv li.bad{background:var(--negbg);color:var(--neg)}.pv li.warn{background:var(--warnbg);color:var(--warn)}.pv li.ok{background:var(--posbg);color:var(--pos)}
+.shot{max-width:100%;max-height:220px;border-radius:10px;border:1px solid var(--line);cursor:zoom-in;display:block;margin-top:8px}
+.kv{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.kv div{background:var(--panel2);border-radius:10px;padding:10px 12px}.kv span{font-size:12px;color:var(--muted);display:block}.kv b{font-size:15px}
+.note{white-space:pre-wrap;background:var(--panel2);border-radius:10px;padding:12px;margin-top:6px;font-size:13.5px}
+#toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);z-index:99;display:grid;gap:8px}
+#toast div{background:var(--text);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;box-shadow:var(--shadow);font-size:13.5px}
+.bottom{display:none}
+.hero-note{padding:46px 24px;text-align:center}.hero-note h2{font-size:22px;margin-bottom:8px}.hero-note p{color:var(--muted);max-width:480px;margin:0 auto 20px}
+footer{margin-top:30px;color:var(--muted);font-size:12px;text-align:center}
+.list-item{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line2);font-size:13.5px;cursor:pointer}.list-item:last-child{border:0}
+@media (max-width:1100px){.g3{grid-template-columns:repeat(2,minmax(0,1fr))}.strip{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi:nth-child(4n){border-right:1px solid var(--line2)}.kpi:nth-child(2n){border-right:0}.kpi:nth-last-child(-n+4){border-bottom:1px solid var(--line2)}.kpi:nth-last-child(-n+2){border-bottom:0}.hero{grid-template-columns:1fr}.hero-r{border-left:0;border-top:1px solid var(--line)}}
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}.side{display:none}
+  main{padding:18px 14px 100px}
+  .g2,.g3,.g21,.fgrid{grid-template-columns:1fr}.kv{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .bottom{display:grid;grid-template-columns:repeat(7,1fr);position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--line);z-index:40;padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px))}
+  .bottom button{border:0;background:none;color:var(--muted);display:grid;justify-items:center;gap:2px;font-size:10.5px;padding:4px 0;cursor:pointer}
+  .bottom button.on{color:var(--accent);font-weight:700}
+  .top h1{font-size:20px}.hero-eq{font-size:32px}
+  .cell{min-height:58px;padding:4px}.cell b{font-size:11px}
+  .toolbar input[type=text]{width:100%}
+  .pv{position:static}
+  .overlay{padding:0}.dlg{border-radius:0;min-height:100%}
+}
+@media print{.side,.bottom,.top-r,.btn,#toast{display:none!important}.app{display:block}.card,.tw{box-shadow:none}}
+</style>
 </head>
-<body class="bg-slate-50">
-    <div id="root"></div>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo">TL</div><div><b id="brandName"></b><small id="brandSub">合約交易日誌</small></div></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot"><span>帳戶淨值 (USDT)</span><b id="eqMini" class="num"></b></div>
+  </aside>
+  <main>
+    <header class="top">
+      <div><h1 id="title"></h1><p id="subtitle"></p></div>
+      <div class="top-r">
+        <select id="rangeSel" aria-label="統計區間">
+          <option value="all">全部時間</option><option value="today">今日</option><option value="7d">近 7 天</option><option value="30d">近 30 天</option><option value="month">本月</option><option value="year">今年</option>
+        </select>
+        <button class="btn" id="cloudBtn" data-act="cloud">雲端…</button>
+        <button class="btn icon" id="themeBtn" title="切換主題" aria-label="切換主題">◐</button>
+        <button class="btn primary" data-act="new">新增交易</button>
+      </div>
+    </header>
+    <div id="view"></div>
+    <footer>本工具僅供交易紀錄與績效分析，不構成任何投資建議。資料預設儲存於本機瀏覽器，登入後可雲端同步；仍建議定期匯出備份。</footer>
+  </main>
+  <nav class="bottom" id="bnav"></nav>
+</div>
+<div id="modal" class="overlay"></div>
+<div id="confirm" class="overlay top"></div>
+<div id="toast"></div>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+<input type="file" id="shotFile" accept="image/*" hidden>
 
-    <script type="text/babel" data-type="module">
-        // 匯入 Firebase SDK
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+<script>
+(() => {
+'use strict';
+/* ============ utils ============ */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+const sum = a => a.reduce((x, y) => x + y, 0);
+const fmt = (n, d = 2) => (n == null || !isFinite(n)) ? '—' : n.toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
+const money = (n, d = 2) => n == null ? '—' : (n > 0 ? '+' : n < 0 ? '-' : '') + '$' + fmt(Math.abs(n), d);
+const usd = (n, d = 2) => n == null ? '—' : (n < 0 ? '-' : '') + '$' + fmt(Math.abs(n), d);
+const pct = (n, d = 1) => (n == null || !isFinite(n)) ? '—' : fmt(n * 100, d) + '%';
+const sgn = n => n > 0 ? 'pos' : n < 0 ? 'neg' : '';
+const price = n => n == null ? '—' : n >= 100 ? fmt(n, 2) : n >= 1 ? fmt(n, 4) : fmt(n, 6);
+const pad = n => String(n).padStart(2, '0');
+const toLocal = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const nowLocal = () => toLocal(new Date());
+const dayOf = s => s.slice(0, 10);
+const fmtDT = s => s ? s.slice(5, 10).replace('-', '/') + ' ' + s.slice(11, 16) : '—';
+const fmtDur = ms => { if (ms == null) return '—'; const m = Math.round(ms / 60000); if (m < 60) return m + ' 分'; const h = m / 60; if (h < 48) return fmt(h, 1) + ' 小時'; return fmt(h / 24, 1) + ' 天'; };
+const ICON = {
+  dashboard:'<path d="M3 3h8v8H3zM13 3h8v5h-8zM13 10h8v11h-8zM3 13h8v8H3z"/>',
+  trades:'<path d="M4 6h16M4 12h16M4 18h10"/>',
+  analytics:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  discipline:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
+  calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  grid:'<path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/>',
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>'
+};
+const svg = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">${ICON[k]}</svg>`;
+const NAV = [['dashboard','總覽'],['trades','合約紀錄'],['analytics','績效分析'],['discipline','交易紀律'],['grid','網格'],['calendar','盈虧日曆'],['settings','設定']];
+const SUB = {dashboard:'帳戶表現與今日風控一覽', trades:'所有開倉與平倉紀錄', analytics:'從不同維度找出你的優勢與漏洞', discipline:'量化你的紀律，看見違規的代價', calendar:'逐日盈虧與週結', grid:'網格機器人獨立記帳，不計入合約績效', settings:'品牌、風控規則、清單與資料管理'};
 
-        const { useState, useEffect, useMemo, useRef } = React;
+/* ============ defaults & state ============ */
+const DEFAULTS = {
+  brand:'TradeLedger Pro', trader:'', capital:1000, theme:'auto',
+  rules:{maxRiskPct:2, maxDailyLoss:50, maxTradesPerDay:5, maxLeverage:20, requireSL:true},
+  checklist:[
+    {id:'c1',text:'符合策略的進場條件'},{id:'c2',text:'已設定止損'},{id:'c3',text:'單筆風險在規則內'},
+    {id:'c4',text:'預期盈虧比 ≥ 1.5'},{id:'c5',text:'已確認大週期方向'},{id:'c6',text:'情緒平穩，非追單或報復'}],
+  mistakes:['追單 FOMO','未設止損','擴大或移動止損','槓桿過高','報復性交易','提前出場','過度交易','違反交易計畫'],
+  strategies:['突破','回踩','區間','趨勢跟隨','反轉'],
+  exchanges:['Pionex (派網)','Binance','Bybit','OKX']
+};
+const EMOTIONS = ['冷靜','自信','猶豫','貪婪','恐懼','FOMO','報復','疲憊'];
+const TFS = ['1m','5m','15m','1h','4h','1D'];
+const COINS = ['BTC','ETH','SOL','BNB','XRP','DOGE','ADA','AVAX','LINK','SUI'];
+const S = {trades:[], grids:[], settings:null, D:{}, equity:0, view:'dashboard', range:'all', cal:new Date(), dim:'coin', limit:50, sort:'new',
+  f:{q:'',status:'all',dir:'all',coin:'all',strategy:'all',date:''}};
+let charts = [], LATER = [], FORM = {shot:null, editId:null}, warned = false;
 
-        // ==========================================
-        // 🔥 Firebase 設定區塊 (雲端大腦)
-        // ==========================================
-        const firebaseConfig = {
-            apiKey: "AIzaSyBUGHn6GRfmwq2HQV-U90bs5-xw1Popgu4",
-            authDomain: "qailtang-tiloan.firebaseapp.com",
-            projectId: "qailtang-tiloan",
-            storageBucket: "qailtang-tiloan.firebasestorage.app",
-            messagingSenderId: "259369901981",
-            appId: "1:259369901981:web:0f192a6bbf156615419974"
-        };
-        
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        
-        // 設定資料庫儲存路徑
-        const getDbPath = (userId) => `users/${userId}/transactions`;
+/* ============ storage (IndexedDB) ============ */
+const IDB = {
+  db:null,
+  open(){ return new Promise((res, rej) => {
+    if (!window.indexedDB) return rej(new Error('no idb'));
+    const r = indexedDB.open('tradeledger-pro', 1);
+    r.onupgradeneeded = () => { r.result.createObjectStore('trades', {keyPath:'id'}); r.result.createObjectStore('kv'); };
+    r.onsuccess = () => { this.db = r.result; res(); };
+    r.onerror = () => rej(r.error);
+  }); },
+  run(store, mode, fn){ return new Promise((res, rej) => {
+    const t = this.db.transaction(store, mode); const s = t.objectStore(store); const rq = fn(s);
+    t.oncomplete = () => res(rq && rq.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+  }); },
+  all(){ return this.run('trades', 'readonly', s => s.getAll()); },
+  put(o){ return this.run('trades', 'readwrite', s => s.put(o)); },
+  putMany(a){ return this.run('trades', 'readwrite', s => { a.forEach(o => s.put(o)); }); },
+  del(id){ return this.run('trades', 'readwrite', s => s.delete(id)); },
+  delMany(ids){ return this.run('trades', 'readwrite', s => { ids.forEach(i => s.delete(i)); }); },
+  clear(){ return this.run('trades', 'readwrite', s => s.clear()); },
+  getKV(k){ return this.run('kv', 'readonly', s => s.get(k)); },
+  setKV(k, v){ return this.run('kv', 'readwrite', s => s.put(v, k)); }
+};
+async function persist(fn){
+  try { if (IDB.db) await fn(); else throw new Error('no db'); }
+  catch (e) { if (!warned) { warned = true; toast('無法使用本機儲存，關閉頁面後資料將遺失，請先匯出備份'); } }
+  scheduleSync();
+}
+const saveSettings = () => persist(() => IDB.setKV('settings', S.settings));
+const saveGrids = () => persist(() => IDB.setKV('grids', S.grids));
 
-        const DEFAULT_CATEGORIES = {
-            INCOME: ['個人捐贈', '匿名捐贈', '政黨補助', '人民團體捐贈', '企業捐贈', '自有資金', '其他收入'],
-            EXPENSE: ['人事費用', '宣傳支出', '租用競選辦事處', '集會支出', '交通運輸', '雜支支出', '公共關係', '返還捐贈']
-        };
-        const STAGES = ['備選期', '正式競選', '選後服務處'];
+/* ============ normalize ============ */
+function norm(o){
+  if (!o || typeof o !== 'object') return null;
+  const n = v => { const x = parseFloat(v); return Number.isFinite(x) ? x : null; };
+  const str = (v, l = 2000) => String(v ?? '').slice(0, l);
+  const re = /^\d{4}-\d\d-\d\dT\d\d:\d\d$/;
+  const t = {
+    id:str(o.id || uid(), 40), coin:str(o.coin, 20).toUpperCase().trim(), dir:o.dir === 'Short' ? 'Short' : 'Long',
+    lev:Math.max(1, Math.round(n(o.lev) || 1)), notional:n(o.notional), entry:n(o.entry), exit:n(o.exit), sl:n(o.sl), tp:n(o.tp),
+    fees:n(o.fees) || 0, openAt:str(o.openAt, 16), closeAt:null, exchange:str(o.exchange, 60), strategy:str(o.strategy, 60), tf:str(o.tf, 10),
+    emotion:str(o.emotion, 20), rating:Math.min(5, Math.max(0, Math.round(n(o.rating) || 0))),
+    checks:Array.isArray(o.checks) ? o.checks.map(x => str(x, 40)) : [], mistakes:Array.isArray(o.mistakes) ? o.mistakes.map(x => str(x, 60)) : [],
+    notes:str(o.notes), review:str(o.review), shot:(typeof o.shot === 'string' && o.shot.startsWith('data:image/')) ? o.shot : null, demo:!!o.demo, updatedAt:Math.max(0, n(o.updatedAt) || 0)
+  };
+  if (!t.coin || !(t.entry > 0) || !(t.notional > 0) || !re.test(t.openAt)) return null;
+  if (t.exit != null) t.closeAt = re.test(String(o.closeAt)) ? o.closeAt : t.openAt;
+  return t;
+}
 
-        const Icon = ({ name, size = 24, className = "" }) => {
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
-            return <i data-lucide={name} style={{width: size, height: size}} className={className}></i>;
-        };
+/* ============ calculations ============ */
+function calc(t){
+  const size = t.entry > 0 ? t.notional / t.entry : 0;
+  const margin = t.lev > 0 ? t.notional / t.lev : 0;
+  const closed = t.exit != null, d = t.dir === 'Long' ? 1 : -1;
+  const gross = closed ? (t.exit - t.entry) * d * size : null;
+  const net = closed ? gross - (t.fees || 0) : null;
+  const risk = t.sl != null ? Math.abs(t.entry - t.sl) * size : null;
+  const R = closed && risk > 0 ? net / risk : null;
+  const rr = (t.sl != null && t.tp != null && t.sl !== t.entry) ? Math.abs(t.tp - t.entry) / Math.abs(t.entry - t.sl) : null;
+  const roi = closed && margin > 0 ? net / margin : null;
+  const liq = t.lev > 0 ? (d === 1 ? t.entry * (1 - 1 / t.lev + 0.005) : t.entry * (1 + 1 / t.lev - 0.005)) : null;
+  const slWrong = t.sl != null && (d === 1 ? t.sl >= t.entry : t.sl <= t.entry);
+  const tpWrong = t.tp != null && (d === 1 ? t.tp <= t.entry : t.tp >= t.entry);
+  const hold = closed && t.closeAt ? new Date(t.closeAt) - new Date(t.openAt) : null;
+  return {size, margin, gross, net, risk, R, rr, roi, liq, slWrong, tpWrong, hold};
+}
+function violList(t, c, eq){
+  const r = S.settings.rules, v = [];
+  if (t.lev > r.maxLeverage) v.push({k:'lev', msg:`槓桿 ${t.lev}X 超過上限 ${r.maxLeverage}X`});
+  if (r.requireSL && t.sl == null) v.push({k:'sl', msg:'未設定止損'});
+  if (c.risk != null && eq > 0 && c.risk / eq * 100 > r.maxRiskPct) v.push({k:'risk', msg:`單筆風險 ${fmt(c.risk / eq * 100, 1)}% 超過 ${r.maxRiskPct}%`});
+  return v;
+}
+const VL = {lev:'槓桿超限', sl:'規則：未設止損', risk:'單筆風險超限'};
+function recompute(){
+  const cap = S.settings.capital;
+  const cl = S.trades.filter(t => t.exit != null && t.closeAt).sort((a, b) => a.closeAt < b.closeAt ? -1 : a.closeAt > b.closeAt ? 1 : 0);
+  const pre = [0]; cl.forEach(t => pre.push(pre[pre.length - 1] + calc(t).net));
+  S.equity = cap + pre[pre.length - 1];
+  S.D = {};
+  const items = S.settings.checklist;
+  S.trades.forEach(t => {
+    const c = calc(t);
+    let lo = 0, hi = cl.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (cl[m].closeAt < t.openAt) lo = m + 1; else hi = m; }
+    const eq = Math.max(cap + pre[lo], 1);
+    const viol = violList(t, c, eq);
+    const chk = items.length ? items.filter(i => t.checks.includes(i.id)).length / items.length : null;
+    S.D[t.id] = {...c, viol, chk, eq, compliant: viol.length === 0 && t.mistakes.length === 0};
+  });
+}
+function rangeFrom(){
+  const r = S.range, n = new Date();
+  if (r === 'today') return `${n.getFullYear()}-${pad(n.getMonth() + 1)}-${pad(n.getDate())}T00:00`;
+  if (r === '7d') return toLocal(new Date(n - 7 * 864e5));
+  if (r === '30d') return toLocal(new Date(n - 30 * 864e5));
+  if (r === 'month') return `${n.getFullYear()}-${pad(n.getMonth() + 1)}-01T00:00`;
+  if (r === 'year') return `${n.getFullYear()}-01-01T00:00`;
+  return '';
+}
+function dataset(){
+  const from = rangeFrom();
+  const all = S.trades.filter(t => t.exit != null && t.closeAt).sort((a, b) => a.closeAt < b.closeAt ? -1 : a.closeAt > b.closeAt ? 1 : 0);
+  let base = S.settings.capital; const list = [];
+  for (const t of all) { if (from && t.closeAt < from) base += S.D[t.id].net; else list.push(t); }
+  return {list, base, all};
+}
+function stats(list, base){
+  const n = list.length, nets = list.map(t => S.D[t.id].net);
+  const Rs = list.map(t => S.D[t.id].R).filter(x => x != null);
+  const w = nets.filter(x => x > 0), l = nets.filter(x => x < 0);
+  const total = sum(nets), gp = sum(w), gl = -sum(l);
+  let eq = base, peak = base, mdd = 0, mddPct = 0, cw = 0, cl = 0, mw = 0, ml = 0;
+  const curve = [{t:null, eq:base}], dd = [];
+  list.forEach((t, i) => {
+    const x = nets[i]; eq += x; peak = Math.max(peak, eq);
+    const d = peak - eq; mdd = Math.max(mdd, d); mddPct = Math.max(mddPct, peak > 0 ? d / peak : 0);
+    curve.push({t:t.closeAt, eq}); dd.push(peak > 0 ? -(d / peak) * 100 : 0);
+    if (x > 0) { cw++; cl = 0; } else if (x < 0) { cl++; cw = 0; } else { cw = 0; cl = 0; }
+    mw = Math.max(mw, cw); ml = Math.max(ml, cl);
+  });
+  const holds = list.map(t => S.D[t.id].hold).filter(x => x != null);
+  return {n, wins:w.length, losses:l.length, winRate:n ? w.length / n : null, total, gp, gl,
+    pf: gl > 0 ? gp / gl : (gp > 0 ? Infinity : null), avgWin:w.length ? gp / w.length : null, avgLoss:l.length ? -gl / l.length : null,
+    payoff:(w.length && l.length) ? (gp / w.length) / (gl / l.length) : null, exp:n ? total / n : null, avgR:Rs.length ? sum(Rs) / Rs.length : null,
+    mdd, mddPct, curve, dd, mw, ml, curStreak:cw > 0 ? cw : -cl, best:n ? Math.max(...nets) : null, worst:n ? Math.min(...nets) : null,
+    fees:sum(list.map(t => t.fees || 0)), avgHold:holds.length ? sum(holds) / holds.length : null, avgLev:n ? sum(list.map(t => t.lev)) / n : null,
+    endEq:eq, base, roi:base > 0 ? total / base : null, recovery:mdd > 0 ? total / mdd : null};
+}
+const pf = v => v == null ? '—' : v === Infinity ? '∞' : fmt(v, 2);
+function groupBy(list, keyFn, order){
+  const m = {};
+  list.forEach(t => { const k = keyFn(t), d = S.D[t.id]; const g = m[k] || (m[k] = {k, n:0, w:0, net:0, gp:0, gl:0}); g.n++; g.net += d.net; if (d.net > 0) { g.w++; g.gp += d.net; } else if (d.net < 0) g.gl -= d.net; });
+  const a = Object.values(m);
+  a.sort(order ? (x, y) => order.indexOf(x.k) - order.indexOf(y.k) : (x, y) => y.net - x.net);
+  if (!order) a.sort((x, y) => y.net - x.net);
+  return a;
+}
+function today(){ return nowLocal().slice(0, 10); }
+function todayStatus(){
+  const td = today();
+  const pnl = sum(S.trades.filter(t => t.exit != null && t.closeAt && dayOf(t.closeAt) === td).map(t => S.D[t.id].net));
+  const opened = S.trades.filter(t => dayOf(t.openAt) === td).length;
+  return {pnl, opened};
+}
 
-        const resizeImage = (file) => {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.src = event.target.result;
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = 600;
-                        const MAX_HEIGHT = 600;
-                        let width = img.width;
-                        let height = img.height;
+/* ============ UI helpers ============ */
+function toast(msg){ const el = document.createElement('div'); el.textContent = msg; $('#toast').appendChild(el); setTimeout(() => el.remove(), 2800); }
+function openModal(html){ const m = $('#modal'); m.innerHTML = html; m.classList.add('show'); m.scrollTop = 0; document.body.style.overflow = 'hidden'; }
+function closeModal(){ $('#modal').classList.remove('show'); $('#modal').innerHTML = ''; document.body.style.overflow = ''; }
+function confirmBox(title, msg, ok = '確定', danger = false){
+  return new Promise(res => {
+    const c = $('#confirm');
+    c.innerHTML = `<div class="dlg sm"><h3>${esc(title)}</h3><p>${esc(msg)}</p><div class="row"><button class="btn" data-no>取消</button><button class="btn ${danger ? 'danger' : 'primary'}" data-ok>${esc(ok)}</button></div></div>`;
+    c.classList.add('show');
+    const done = v => { c.classList.remove('show'); c.innerHTML = ''; res(v); };
+    c.querySelector('[data-ok]').onclick = () => done(true);
+    c.querySelector('[data-no]').onclick = () => done(false);
+  });
+}
+function download(text, name, type){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function getC(){ const s = getComputedStyle(document.documentElement), g = k => s.getPropertyValue(k).trim(); return {text:g('--text'), muted:g('--muted'), line:g('--line2'), accent:g('--accent'), pos:g('--pos'), neg:g('--neg'), warn:g('--warn')}; }
+function mk(id, cfg){
+  const el = document.getElementById(id); if (!el) return;
+  if (typeof Chart === 'undefined') { el.parentElement.innerHTML = '<div class="empty">圖表元件載入失敗（首次使用需連網載入 Chart.js）</div>'; return; }
+  const c = getC(); Chart.defaults.color = c.muted; Chart.defaults.font.family = getComputedStyle(document.body).fontFamily; Chart.defaults.borderColor = c.line;
+  charts.push(new Chart(el, cfg));
+}
+function baseOpts(yFmt, extra = {}){
+  return {responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+    plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx => ' ' + (yFmt ? yFmt(ctx.parsed.y ?? ctx.parsed) : ctx.formattedValue)}}},
+    scales:{x:{grid:{display:false}, ticks:{maxTicksLimit:8, maxRotation:0}}, y:{ticks:{callback:v => yFmt ? yFmt(v) : v}}}, ...extra};
+}
+function barChart(id, labels, data, yFmt){
+  const c = getC();
+  mk(id, {type:'bar', data:{labels, datasets:[{data, backgroundColor:data.map(v => v >= 0 ? c.pos : c.neg), borderRadius:4, maxBarThickness:36}]}, options:baseOpts(yFmt)});
+}
+const empty = (msg = '尚無已平倉的交易資料') => `<div class="empty">${msg}</div>`;
 
-                        if (width > height) {
-                            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
-                        } else {
-                            if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
-                        }
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.6));
-                    };
-                };
-            });
-        };
+/* ============ views ============ */
+function vDashboard(){
+  if (!S.trades.length) return `<div class="card hero-note"><h2>歡迎使用 ${esc(S.settings.brand)}</h2><p>記錄每一筆合約交易，系統會自動計算盈虧、R 倍數、回撤與紀律分數。先新增第一筆交易，或載入範例資料先看看效果。</p><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn primary" data-act="new">新增第一筆交易</button><button class="btn" data-act="demo">載入範例資料</button></div></div>`;
+  const {list, base, all} = dataset(), s = stats(list, base);
+  const ts = todayStatus(), r = S.settings.rules, open = S.trades.filter(t => t.exit == null);
+  let alerts = '';
+  if (ts.pnl <= -r.maxDailyLoss && r.maxDailyLoss > 0) alerts += `<div class="alert bad"><b>已觸及當日虧損上限</b>今日已實現 ${money(ts.pnl)}，上限 -$${fmt(r.maxDailyLoss, 0)}。建議今天停止開新倉。</div>`;
+  if (ts.opened >= r.maxTradesPerDay) alerts += `<div class="alert warn"><b>今日交易筆數已達上限</b>今天已開 ${ts.opened} 筆，規則上限 ${r.maxTradesPerDay} 筆。</div>`;
+  if (open.length) alerts += `<div class="alert info"><b>持倉中 ${open.length} 筆</b>平倉後請回來補上平倉價與復盤。</div>`;
+  const closedAll = all, comp = closedAll.filter(t => S.D[t.id].compliant).length;
+  const score = closedAll.length ? comp / closedAll.length : null;
+  const R = 52, C2 = 2 * Math.PI * R, off = C2 * (1 - (score || 0));
+  const ringCol = score == null ? 'var(--line)' : score >= .8 ? 'var(--pos)' : score >= .5 ? 'var(--warn)' : 'var(--neg)';
+  const eqNow = S.equity, eqPnl = eqNow - S.settings.capital;
+  later(() => {
+    const c = getC();
+    mk('ch_hero', {type:'line', data:{labels:s.curve.map((p, i) => i ? fmtDT(p.t) : '起點'), datasets:[{data:s.curve.map(p => p.eq), borderColor:c.accent, backgroundColor:c.accent + '1f', fill:true, tension:.28, pointRadius:0, borderWidth:2}]},
+      options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{intersect:false, mode:'index', callbacks:{label:x => ' $' + fmt(x.parsed.y)}}}, scales:{x:{display:false}, y:{display:false}}, layout:{padding:0}}});
+    mk('ch_dd', {type:'line', data:{labels:s.curve.slice(1).map(p => fmtDT(p.t)), datasets:[{data:s.dd, borderColor:c.neg, backgroundColor:c.neg + '22', fill:true, tension:.2, pointRadius:0, borderWidth:1.5}]}, options:baseOpts(v => fmt(v, 1) + '%')});
+    const days = {}; list.forEach(t => { const k = dayOf(t.closeAt); days[k] = (days[k] || 0) + S.D[t.id].net; });
+    const keys = Object.keys(days).sort().slice(-30);
+    barChart('ch_day', keys.map(k => k.slice(5)), keys.map(k => +days[k].toFixed(2)), v => '$' + fmt(v, 0));
+  });
+  const kpis = [
+    ['區間淨盈虧', `<b class="${sgn(s.total)}">${money(s.total)}</b>`, s.roi != null ? `${pct(s.roi)} 起始淨值` : ''],
+    ['勝率', `<b>${pct(s.winRate)}</b>`, `${s.wins} 勝 / ${s.losses} 負`],
+    ['獲利因子', `<b>${pf(s.pf)}</b>`, '總獲利 ÷ 總虧損'],
+    ['每筆期望值', `<b class="${sgn(s.exp)}">${money(s.exp)}</b>`, s.avgR != null ? `平均 ${fmt(s.avgR, 2)} R` : '平均 R：—'],
+    ['平均獲利 / 虧損', `<b><span class="pos">${usd(s.avgWin)}</span> / <span class="neg">${usd(s.avgLoss)}</span></b>`, s.payoff != null ? `盈虧比 ${fmt(s.payoff, 2)}` : ''],
+    ['最大回撤', `<b class="neg">${usd(-s.mdd)}</b>`, pct(s.mddPct) + ' 峰值回落'],
+    ['累計手續費與資金費', `<b>${usd(s.fees)}</b>`, s.gp > 0 ? `占總獲利 ${pct(s.fees / s.gp)}` : ''],
+    ['連勝 / 連敗上限', `<b>${s.mw} / ${s.ml}</b>`, s.curStreak ? `目前 ${s.curStreak > 0 ? s.curStreak + ' 連勝' : -s.curStreak + ' 連敗'}` : '']
+  ].map(k => `<div class="kpi"><span>${k[0]}</span>${k[1]}<small>${k[2]}</small></div>`).join('');
+  const recent = [...S.trades].sort((a, b) => (b.closeAt || b.openAt) < (a.closeAt || a.openAt) ? -1 : 1).slice(0, 6).map(t => { const d = S.D[t.id];
+    return `<div class="list-item" data-act="view" data-id="${t.id}"><span><b>${esc(t.coin)}</b> <span class="tag ${t.dir === 'Long' ? 'long' : 'short'}">${t.dir === 'Long' ? '多' : '空'} ${t.lev}X</span><small class="muted" style="display:block">${fmtDT(t.closeAt || t.openAt)}</small></span><b class="num ${sgn(d.net)}">${t.exit == null ? '持倉中' : money(d.net)}</b></div>`; }).join('');
+  return `${alerts}
+  <div class="card hero mb"><div class="hero-l"><small>帳戶淨值 (USDT)</small><div class="hero-eq">$${fmt(eqNow)}</div>
+    <div class="hero-sub"><span class="${sgn(eqPnl)}">${money(eqPnl)}</span> <span class="muted">自起始本金 $${fmt(S.settings.capital, 0)}（${pct(eqPnl / S.settings.capital)}）</span></div>
+    <div class="chart"><canvas id="ch_hero"></canvas></div></div>
+    <div class="hero-r"><div class="ring"><svg width="118" height="118" viewBox="0 0 118 118"><circle cx="59" cy="59" r="${R}" fill="none" stroke="var(--line2)" stroke-width="9"/><circle cx="59" cy="59" r="${R}" fill="none" stroke="${ringCol}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C2}" stroke-dashoffset="${off}"/></svg><div><b>${score == null ? '—' : Math.round(score * 100)}</b><span>紀律分</span></div></div>
+    <ul><li><span class="muted">今日已實現</span><b class="${sgn(ts.pnl)}">${money(ts.pnl)}</b></li><li><span class="muted">今日開倉</span><b>${ts.opened} / ${r.maxTradesPerDay}</b></li><li><span class="muted">守紀律交易</span><b>${comp} / ${closedAll.length}</b></li><li><span class="muted">持倉中</span><b>${open.length}</b></li></ul></div></div>
+  <div class="strip mb">${kpis}</div>
+  ${list.length ? `<div class="grid g2 mb"><div class="card"><h3>回撤曲線 <small>峰值回落 %</small></h3><div class="chart sm"><canvas id="ch_dd"></canvas></div></div><div class="card"><h3>每日盈虧 <small>近 30 個交易日</small></h3><div class="chart sm"><canvas id="ch_day"></canvas></div></div></div>` : `<div class="card mb">${empty('此區間沒有已平倉交易')}</div>`}
+  <div class="grid g2"><div class="card"><h3>最近交易 <button class="btn sm" data-act="nav" data-v="trades">全部</button></h3>${recent || empty()}</div>
+  <div class="card"><h3>持倉中</h3>${open.length ? open.map(t => { const d = S.D[t.id]; return `<div class="list-item" data-act="view" data-id="${t.id}"><span><b>${esc(t.coin)}</b> <span class="tag ${t.dir === 'Long' ? 'long' : 'short'}">${t.dir === 'Long' ? '多' : '空'} ${t.lev}X</span><small class="muted" style="display:block">開倉 ${price(t.entry)} · 風險 ${d.risk != null ? usd(d.risk) : '未設止損'}</small></span><button class="btn sm" data-act="edit" data-id="${t.id}">平倉</button></div>`; }).join('') : empty('目前沒有持倉')}</div></div>`;
+}
 
-        const PieChart = ({ data, title }) => {
-            const chartRef = useRef(null);
-            const chartInstance = useRef(null);
+function filtered(){
+  const f = S.f;
+  const a = S.trades.filter(t => {
+    const d = S.D[t.id];
+    if (f.status === 'open' && t.exit != null) return false;
+    if (f.status === 'closed' && t.exit == null) return false;
+    if (f.status === 'win' && !(d.net > 0)) return false;
+    if (f.status === 'loss' && !(d.net < 0)) return false;
+    if (f.status === 'viol' && d.compliant) return false;
+    if (f.dir !== 'all' && t.dir !== f.dir) return false;
+    if (f.coin !== 'all' && t.coin !== f.coin) return false;
+    if (f.strategy !== 'all' && t.strategy !== f.strategy) return false;
+    if (f.date && !(dayOf(t.openAt) === f.date || (t.closeAt && dayOf(t.closeAt) === f.date))) return false;
+    if (f.q && !`${t.coin} ${t.strategy} ${t.exchange} ${t.notes} ${t.review} ${t.mistakes.join(' ')}`.toLowerCase().includes(f.q.toLowerCase())) return false;
+    return true;
+  });
+  const nv = (t, k) => { const v = S.D[t.id][k]; return v == null ? -Infinity : v; };
+  const so = {new:(x, y) => x.openAt < y.openAt ? 1 : -1, old:(x, y) => x.openAt < y.openAt ? -1 : 1, pnl_d:(x, y) => nv(y, 'net') - nv(x, 'net'), pnl_a:(x, y) => nv(x, 'net') - nv(y, 'net'), r_d:(x, y) => nv(y, 'R') - nv(x, 'R')};
+  return a.sort(so[S.sort]);
+}
+function tradeRow(t){
+  const d = S.D[t.id], dis = d.compliant ? '<span class="tag ok">守紀律</span>' : `<span class="tag bad">${d.viol.length + t.mistakes.length} 項違規</span>`;
+  return `<tr data-act="view" data-id="${t.id}">
+  <td class="num">${fmtDT(t.openAt)}<small>${t.closeAt ? '→ ' + fmtDT(t.closeAt) : ''}</small></td>
+  <td><b>${esc(t.coin)}</b> <span class="tag ${t.dir === 'Long' ? 'long' : 'short'}">${t.dir === 'Long' ? '多' : '空'} ${t.lev}X</span><small>${esc(t.exchange)}</small></td>
+  <td class="r num">$${fmt(t.notional)}<small>保證金 $${fmt(d.margin)}</small></td>
+  <td class="r num">${price(t.entry)}<small>${t.exit != null ? '→ ' + price(t.exit) : '<span class="tag open">持倉中</span>'}</small></td>
+  <td class="r num">${t.sl != null ? price(t.sl) : '<span class="warn">未設</span>'}<small>${t.tp != null ? 'TP ' + price(t.tp) : ''}</small></td>
+  <td class="r num ${sgn(d.R)}">${d.R != null ? fmt(d.R, 2) + 'R' : '—'}</td>
+  <td class="r num ${sgn(d.net)}"><b>${d.net != null ? money(d.net) : '—'}</b><small>${d.roi != null ? pct(d.roi) + ' 保證金' : ''}</small></td>
+  <td>${esc(t.strategy) || '<span class="muted">—</span>'}</td>
+  <td>${t.exit != null ? dis : '<span class="muted">—</span>'}</td>
+  <td class="r" style="white-space:nowrap"><button class="btn sm" data-act="edit" data-id="${t.id}">編輯</button> <button class="btn sm danger" data-act="del" data-id="${t.id}">刪除</button></td></tr>`;
+}
+function renderRows(){
+  const a = filtered(), el = $('#tbody'); if (!el) return;
+  el.innerHTML = a.length ? a.slice(0, S.limit).map(tradeRow).join('') : `<tr><td colspan="10">${empty('沒有符合條件的交易')}</td></tr>`;
+  $('#tcount').textContent = `${a.length} 筆`;
+  $('#more').style.display = a.length > S.limit ? '' : 'none';
+}
+function vTrades(){
+  const f = S.f, coins = [...new Set(S.trades.map(t => t.coin))].sort(), strs = [...new Set(S.trades.map(t => t.strategy).filter(Boolean))].sort();
+  const opt = (arr, cur, all) => `<option value="all">${all}</option>` + arr.map(x => `<option value="${esc(x)}" ${cur === x ? 'selected' : ''}>${esc(x)}</option>`).join('');
+  later(renderRows);
+  return `<div class="toolbar">
+    <input type="text" placeholder="搜尋幣種、策略、備註…" value="${esc(f.q)}" data-f="q" aria-label="搜尋">
+    <select data-f="status">${[['all','全部狀態'],['open','持倉中'],['closed','已平倉'],['win','獲利'],['loss','虧損'],['viol','有違規']].map(o => `<option value="${o[0]}" ${f.status === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>
+    <select data-f="dir"><option value="all">多空不限</option><option value="Long" ${f.dir === 'Long' ? 'selected' : ''}>多頭</option><option value="Short" ${f.dir === 'Short' ? 'selected' : ''}>空頭</option></select>
+    <select data-f="coin">${opt(coins, f.coin, '全部幣種')}</select>
+    <select data-f="strategy">${opt(strs, f.strategy, '全部策略')}</select>
+    <select data-s="sort">${[['new','最新優先'],['old','最舊優先'],['pnl_d','盈利最高'],['pnl_a','虧損最大'],['r_d','R 倍數最高']].map(o => `<option value="${o[0]}" ${S.sort === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>
+    ${f.date ? `<button class="btn sm" data-act="clrdate">日期：${f.date} ✕</button>` : ''}
+    <span class="muted" id="tcount" style="margin-left:auto"></span>
+    <button class="btn" data-act="csv">匯出 CSV</button>
+  </div>
+  <div class="tw"><table><thead><tr><th>時間</th><th>幣種 / 方向</th><th class="r">倉位價值</th><th class="r">開倉 → 平倉</th><th class="r">止損 / 止盈</th><th class="r">R 倍數</th><th class="r">淨盈虧</th><th>策略</th><th>紀律</th><th></th></tr></thead><tbody id="tbody"></tbody></table></div>
+  <div class="c" style="margin-top:14px"><button class="btn" id="more" data-act="more">載入更多</button></div>`;
+}
 
-            useEffect(() => {
-                if (chartInstance.current) chartInstance.current.destroy();
-                if (data.length === 0) return;
+const lvB = l => l <= 5 ? '1–5X' : l <= 10 ? '6–10X' : l <= 20 ? '11–20X' : l <= 50 ? '21–50X' : '50X 以上';
+const DIMS = {
+  coin:{n:'幣種', k:t => t.coin}, strategy:{n:'策略', k:t => t.strategy || '未分類'}, exchange:{n:'平台', k:t => t.exchange || '未填'},
+  dir:{n:'方向', k:t => t.dir === 'Long' ? '多頭' : '空頭'}, lev:{n:'槓桿', k:t => lvB(t.lev), ord:['1–5X','6–10X','11–20X','21–50X','50X 以上']},
+  wd:{n:'星期', k:t => '週' + '日一二三四五六'[new Date(t.openAt).getDay()], ord:['週一','週二','週三','週四','週五','週六','週日']},
+  hour:{n:'開倉時段', k:t => { const h = Math.floor(+t.openAt.slice(11, 13) / 3) * 3; return `${pad(h)}–${pad(h + 3)}時`; }},
+  emotion:{n:'情緒', k:t => t.emotion || '未填'}, tf:{n:'週期', k:t => t.tf || '未填', ord:['1m','5m','15m','1h','4h','1D','未填']}
+};
+function vAnalytics(){
+  const {list, base} = dataset(); if (!list.length) return `<div class="card">${empty('此區間沒有已平倉交易可供分析')}</div>`;
+  const s = stats(list, base), dm = DIMS[S.dim];
+  let rows = groupBy(list, dm.k, dm.ord && null);
+  if (dm.ord) rows = groupBy(list, dm.k, dm.ord).filter(g => g.n);
+  else if (S.dim === 'hour') rows.sort((a, b) => a.k < b.k ? -1 : 1);
+  later(() => {
+    barChart('ch_dim', rows.map(g => g.k), rows.map(g => +g.net.toFixed(2)), v => '$' + fmt(v, 0));
+    const Rs = list.map(t => S.D[t.id].R).filter(x => x != null);
+    if (Rs.length) {
+      const bins = [['< -2',x => x < -2],['-2~-1',x => x >= -2 && x < -1],['-1~0',x => x >= -1 && x < 0],['0~1',x => x >= 0 && x < 1],['1~2',x => x >= 1 && x < 2],['2~3',x => x >= 2 && x < 3],['≥ 3',x => x >= 3]];
+      const c = getC();
+      mk('ch_r', {type:'bar', data:{labels:bins.map(b => b[0]), datasets:[{data:bins.map(b => Rs.filter(b[1]).length), backgroundColor:bins.map((b, i) => i < 3 ? c.neg : c.pos), borderRadius:4}]}, options:baseOpts(v => v + ' 筆')});
+    }
+    const wl = [s.wins, s.losses, list.length - s.wins - s.losses]; const c = getC();
+    mk('ch_wl', {type:'doughnut', data:{labels:['獲利','虧損','持平'], datasets:[{data:wl, backgroundColor:[c.pos, c.neg, c.muted], borderWidth:0}]}, options:{responsive:true, maintainAspectRatio:false, cutout:'68%', plugins:{legend:{position:'bottom'}}}});
+  });
+  const hasR = list.some(t => S.D[t.id].R != null);
+  const L = list.filter(t => t.dir === 'Long'), Sh = list.filter(t => t.dir === 'Short');
+  const dirRow = (n, a) => { const x = stats(a, 0); return `<tr style="cursor:default"><td>${n}</td><td class="r">${x.n}</td><td class="r">${pct(x.winRate)}</td><td class="r ${sgn(x.total)}">${money(x.total)}</td><td class="r">${pf(x.pf)}</td></tr>`; };
+  const st = [['平均持倉', fmtDur(s.avgHold)], ['平均槓桿', s.avgLev != null ? fmt(s.avgLev, 1) + 'X' : '—'], ['單筆最佳', money(s.best)], ['單筆最差', money(s.worst)], ['盈虧比', s.payoff != null ? fmt(s.payoff, 2) : '—'], ['恢復因子', s.recovery != null ? fmt(s.recovery, 2) : '—'], ['最長連勝 / 連敗', s.mw + ' / ' + s.ml], ['總手續費', usd(s.fees)]];
+  return `<div class="strip mb" style="grid-template-columns:repeat(4,minmax(0,1fr))">${st.map(k => `<div class="kpi"><span>${k[0]}</span><b>${k[1]}</b></div>`).join('')}</div>
+  <div class="card mb"><h3>分組績效 <div class="toolbar" style="margin:0"><select data-s="dim">${Object.entries(DIMS).map(([k, v]) => `<option value="${k}" ${S.dim === k ? 'selected' : ''}>依${v.n}</option>`).join('')}</select></div></h3>
+    <div class="grid g21"><div class="chart tall"><canvas id="ch_dim"></canvas></div>
+    <div style="overflow-x:auto"><table style="min-width:360px"><thead><tr><th>${dm.n}</th><th class="r">筆數</th><th class="r">勝率</th><th class="r">淨盈虧</th><th class="r">PF</th></tr></thead><tbody>${rows.map(g => `<tr style="cursor:default"><td><b>${esc(g.k)}</b></td><td class="r">${g.n}</td><td class="r">${pct(g.w / g.n, 0)}</td><td class="r ${sgn(g.net)}">${money(g.net)}</td><td class="r">${pf(g.gl > 0 ? g.gp / g.gl : (g.gp > 0 ? Infinity : null))}</td></tr>`).join('')}</tbody></table></div></div></div>
+  <div class="grid g3"><div class="card"><h3>勝負比例</h3><div class="chart sm"><canvas id="ch_wl"></canvas></div></div>
+  <div class="card"><h3>R 倍數分布 <small>需設定止損</small></h3>${hasR ? '<div class="chart sm"><canvas id="ch_r"></canvas></div>' : empty('沒有設定止損的已平倉交易')}</div>
+  <div class="card"><h3>多空比較</h3><table style="min-width:0"><thead><tr><th></th><th class="r">筆數</th><th class="r">勝率</th><th class="r">淨盈虧</th><th class="r">PF</th></tr></thead><tbody>${dirRow('多頭', L)}${dirRow('空頭', Sh)}</tbody></table></div></div>`;
+}
 
-                const ctx = chartRef.current.getContext('2d');
-                chartInstance.current = new Chart(ctx, {
-                    type: 'pie',
-                    data: {
-                        labels: data.map(d => d.label),
-                        datasets: [{
-                            data: data.map(d => d.value),
-                            backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#64748b', '#14b8a6'],
-                            borderWidth: 1
-                        }]
-                    },
-                    options: { 
-                        responsive: true, 
-                        plugins: { title: { display: true, text: title, font: { size: 16, family: 'Noto Sans TC' } } } 
-                    }
-                });
-                return () => { if (chartInstance.current) chartInstance.current.destroy(); };
-            }, [data, title]);
+function vDiscipline(){
+  const {list} = dataset(), r = S.settings.rules, ts = todayStatus();
+  const comp = list.filter(t => S.D[t.id].compliant), non = list.filter(t => !S.D[t.id].compliant);
+  const sc = stats(comp, 0), sn = stats(non, 0);
+  const chks = list.map(t => S.D[t.id].chk).filter(x => x != null);
+  const rate = list.length ? comp.length / list.length : null;
+  const mm = {};
+  list.forEach(t => { const d = S.D[t.id]; const tags = [...t.mistakes, ...d.viol.map(v => VL[v.k])]; new Set(tags).forEach(k => { const g = mm[k] || (mm[k] = {k, n:0, net:0}); g.n++; g.net += d.net; }); });
+  const mrows = Object.values(mm).sort((a, b) => a.net - b.net);
+  const emo = groupBy(list, t => t.emotion || '未填');
+  const meter = (label, val, max, text, invert) => { const p = max > 0 ? Math.min(1, Math.max(0, val / max)) : 0; return `<div class="meter"><div><span>${label}</span><b>${text}</b></div><div class="bar"><i class="${p >= 1 ? 'bad' : p >= .7 ? 'warn' : 'ok'}" style="width:${p * 100}%"></i></div></div>`; };
+  const viols = list.filter(t => !S.D[t.id].compliant).slice(-6).reverse();
+  later(() => { if (mrows.length) { const c = getC(); mk('ch_mis', {type:'bar', data:{labels:mrows.map(g => g.k), datasets:[{data:mrows.map(g => +g.net.toFixed(2)), backgroundColor:mrows.map(g => g.net >= 0 ? c.pos : c.neg), borderRadius:4}]}, options:{...baseOpts(v => '$' + fmt(v, 0)), indexAxis:'y', scales:{x:{ticks:{callback:v => '$' + fmt(v, 0)}}, y:{grid:{display:false}}}}}); } });
+  return `<div class="grid g3 mb">
+    <div class="card"><h3>守紀律率</h3><div class="hero-eq ${rate == null ? '' : rate >= .8 ? 'pos' : rate >= .5 ? 'warn' : 'neg'}" style="font-size:36px">${pct(rate, 0)}</div><p class="muted">${comp.length} / ${list.length} 筆交易沒有任何違規或錯誤標籤</p></div>
+    <div class="card"><h3>清單平均完成度</h3><div class="hero-eq" style="font-size:36px">${chks.length ? pct(sum(chks) / chks.length, 0) : '—'}</div><p class="muted">進場前檢查清單的平均勾選比例</p></div>
+    <div class="card"><h3>違規的代價</h3><div class="hero-eq ${sgn(sn.total)}" style="font-size:36px">${non.length ? money(sn.total) : '—'}</div><p class="muted">${non.length ? `違規交易 ${non.length} 筆；守紀律交易為 ${money(sc.total)}` : '目前沒有違規交易'}</p></div></div>
+  <div class="grid g2 mb"><div class="card"><h3>今日風控</h3>
+    ${meter('今日虧損 / 上限', Math.max(0, -ts.pnl), r.maxDailyLoss, `${usd(Math.max(0, -ts.pnl))} / $${fmt(r.maxDailyLoss, 0)}`)}
+    ${meter('今日開倉 / 上限', ts.opened, r.maxTradesPerDay, `${ts.opened} / ${r.maxTradesPerDay} 筆`)}
+    <div class="muted" style="font-size:12.5px">單筆風險上限 ${r.maxRiskPct}% 淨值 · 槓桿上限 ${r.maxLeverage}X · ${r.requireSL ? '必須設定止損' : '止損不強制'}　<a href="#" data-act="nav" data-v="settings" style="color:var(--accent)">調整規則</a></div></div>
+    <div class="card"><h3>守紀律 vs 違規 <small>期望值對比</small></h3><table style="min-width:0"><thead><tr><th></th><th class="r">筆數</th><th class="r">勝率</th><th class="r">每筆期望</th><th class="r">淨盈虧</th></tr></thead><tbody>
+    <tr style="cursor:default"><td>守紀律</td><td class="r">${sc.n}</td><td class="r">${pct(sc.winRate, 0)}</td><td class="r ${sgn(sc.exp)}">${money(sc.exp)}</td><td class="r ${sgn(sc.total)}">${money(sc.total)}</td></tr>
+    <tr style="cursor:default"><td>有違規</td><td class="r">${sn.n}</td><td class="r">${pct(sn.winRate, 0)}</td><td class="r ${sgn(sn.exp)}">${money(sn.exp)}</td><td class="r ${sgn(sn.total)}">${money(sn.total)}</td></tr></tbody></table></div></div>
+  <div class="grid g2 mb"><div class="card"><h3>錯誤與違規的盈虧影響</h3>${mrows.length ? '<div class="chart tall"><canvas id="ch_mis"></canvas></div>' : empty('沒有錯誤標籤或違規紀錄，保持下去')}</div>
+    <div class="card"><h3>情緒與績效</h3>${emo.length ? `<table style="min-width:0"><thead><tr><th>情緒</th><th class="r">筆數</th><th class="r">勝率</th><th class="r">淨盈虧</th></tr></thead><tbody>${emo.map(g => `<tr style="cursor:default"><td>${esc(g.k)}</td><td class="r">${g.n}</td><td class="r">${pct(g.w / g.n, 0)}</td><td class="r ${sgn(g.net)}">${money(g.net)}</td></tr>`).join('')}</tbody></table>` : empty()}</div></div>
+  <div class="card"><h3>近期違規交易</h3>${viols.length ? viols.map(t => { const d = S.D[t.id]; return `<div class="list-item" data-act="view" data-id="${t.id}"><span><b>${esc(t.coin)}</b> <span class="muted">${fmtDT(t.closeAt)}</span><small class="neg" style="display:block">${esc([...t.mistakes, ...d.viol.map(v => v.msg)].join('、'))}</small></span><b class="num ${sgn(d.net)}">${money(d.net)}</b></div>`; }).join('') : empty('此區間沒有違規交易')}</div>`;
+}
 
-            if (data.length === 0) return <div className="text-slate-400 text-center py-8">尚無資料可產出圖表</div>;
-            return <canvas ref={chartRef}></canvas>;
-        };
+function vCalendar(){
+  const y = S.cal.getFullYear(), m = S.cal.getMonth(), {all} = dataset(), by = {};
+  all.forEach(t => { const k = dayOf(t.closeAt), d = by[k] || (by[k] = {pnl:0, n:0}); d.pnl += S.D[t.id].net; d.n++; });
+  const dim = new Date(y, m + 1, 0).getDate(), lead = new Date(y, m, 1).getDay(), td = today();
+  const mx = Math.max(1, ...Object.entries(by).filter(([k]) => k.startsWith(`${y}-${pad(m + 1)}`)).map(([, v]) => Math.abs(v.pnl)));
+  let html = ['日','一','二','三','四','五','六'].map(x => `<div class="h">${x}</div>`).join('') + '<div class="h">週結</div>';
+  let wk = 0, wn = 0, mp = 0, mn = 0, days = 0, wd = 0, col = 0;
+  const flush = () => { html += `<div class="cell wk"><span class="d">週</span><b class="${sgn(wk)}">${wn ? money(wk, 0) : '—'}</b></div>`; wk = 0; wn = 0; col = 0; };
+  for (let i = 0; i < lead; i++) { html += '<div></div>'; col++; }
+  for (let d = 1; d <= dim; d++) {
+    const k = `${y}-${pad(m + 1)}-${pad(d)}`, v = by[k];
+    if (v) { wk += v.pnl; wn += v.n; mp += v.pnl; mn += v.n; days++; if (v.pnl > 0) wd++; }
+    const a = v ? Math.round(14 + Math.abs(v.pnl) / mx * 38) : 0;
+    const bg = v ? `background:color-mix(in srgb, var(${v.pnl >= 0 ? '--pos' : '--neg'}) ${a}%, transparent)` : '';
+    html += `<div class="cell ${v ? 'has' : ''} ${k === td ? 'today' : ''}" style="${bg}" ${v ? `data-act="day" data-d="${k}"` : ''}><span class="d">${d}</span>${v ? `<b class="${sgn(v.pnl)}">${money(v.pnl, 0)}</b><span class="muted">${v.n} 筆</span>` : ''}</div>`;
+    col++; if (col === 7) flush();
+  }
+  if (col > 0) { while (col < 7) { html += '<div></div>'; col++; } flush(); }
+  return `<div class="card"><h3><span style="display:flex;gap:8px;align-items:center"><button class="btn sm" data-act="calprev">‹</button><b style="font-size:16px">${y} 年 ${m + 1} 月</b><button class="btn sm" data-act="calnext">›</button><button class="btn sm" data-act="caltoday">本月</button></span>
+    <span style="font-weight:400;font-size:13px">本月 <b class="${sgn(mp)}">${money(mp)}</b> · ${mn} 筆 · 獲利日 ${wd}/${days}</span></h3><div class="cal">${html}</div></div>`;
+}
 
-        function App() {
-            // 雲端驗證狀態
-            const [user, setUser] = useState(null);
-            const [isAuthLoading, setIsAuthLoading] = useState(true);
-            const [dbStatus, setDbStatus] = useState('等待登入...');
+function chipEditor(key, title, hint){
+  const items = S.settings[key];
+  return `<div class="field"><label class="fl">${title}</label><div class="chips">${items.map((x, i) => `<span class="chip">${esc(key === 'checklist' ? x.text : x)}<span class="x" data-act="rm" data-k="${key}" data-i="${i}" title="移除">×</span></span>`).join('')}</div>
+  <div style="display:flex;gap:8px;margin-top:8px"><input type="text" id="add_${key}" placeholder="${hint}" maxlength="40"><button class="btn" data-act="add" data-k="${key}">新增</button></div></div>`;
+}
+function vSettings(){
+  const s = S.settings, r = s.rules, demoN = S.trades.filter(t => t.demo).length + S.grids.filter(t => t.demo).length;
+  const fld = (label, path, val, type = 'number', extra = '') => `<div class="field"><label class="fl">${label}</label><input type="${type}" data-set="${path}" value="${esc(val)}" ${extra}></div>`;
+  return `<div class="grid g2 mb"><div class="card"><h3>品牌與帳戶</h3>
+    ${fld('產品 / 品牌名稱', 'brand', s.brand, 'text', 'maxlength="30"')}${fld('交易者名稱', 'trader', s.trader, 'text', 'maxlength="30"')}
+    ${fld('起始本金 (USDT)', 'capital', s.capital, 'number', 'min="1" step="any"')}
+    <div class="field"><label class="fl">主題</label><select data-set="theme" style="width:100%"><option value="auto" ${s.theme === 'auto' ? 'selected' : ''}>跟隨系統</option><option value="light" ${s.theme === 'light' ? 'selected' : ''}>淺色</option><option value="dark" ${s.theme === 'dark' ? 'selected' : ''}>深色</option></select></div></div>
+  <div class="card"><h3>風控與紀律規則 <small>違反時會在交易紀錄中標示</small></h3>
+    ${fld('單筆最大風險 (% 淨值)', 'rules.maxRiskPct', r.maxRiskPct, 'number', 'min="0.1" step="0.1"')}${fld('單日最大虧損 (USDT)', 'rules.maxDailyLoss', r.maxDailyLoss, 'number', 'min="0" step="any"')}
+    ${fld('單日最多開倉筆數', 'rules.maxTradesPerDay', r.maxTradesPerDay, 'number', 'min="1" step="1"')}${fld('最高槓桿 (X)', 'rules.maxLeverage', r.maxLeverage, 'number', 'min="1" step="1"')}
+    <label class="chk"><input type="checkbox" data-set="rules.requireSL" ${r.requireSL ? 'checked' : ''}><span>每筆交易必須設定止損</span></label></div></div>
+  <div class="card mb"><h3>清單與標籤</h3><div class="grid g2"><div>${chipEditor('checklist', '進場前檢查清單', '例：已確認消息面')}${chipEditor('mistakes', '錯誤標籤', '例：沒等收線')}</div><div>${chipEditor('strategies', '策略', '例：假突破')}${chipEditor('exchanges', '交易平台', '例：Bitget')}</div></div></div>
+  <div class="card"><h3>資料管理</h3><p class="muted" style="margin-bottom:12px">資料只存在這台裝置的瀏覽器中。建議每週匯出一次 JSON 備份；換裝置時用匯入還原。</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="json">匯出完整備份 (JSON)</button><button class="btn" data-act="import">匯入備份</button><button class="btn" data-act="csv">匯出 CSV</button><button class="btn" data-act="demo">載入範例資料</button>${demoN ? `<button class="btn" data-act="rmdemo">移除範例資料 (${demoN})</button>` : ''}<button class="btn danger" data-act="wipe">清除全部資料</button></div></div>`;
+}
+function later(fn){ LATER.push(fn); }
 
-            // 登入表單狀態
-            const [email, setEmail] = useState('');
-            const [password, setPassword] = useState('');
-            const [isRegistering, setIsRegistering] = useState(false);
-            const [authError, setAuthError] = useState('');
+/* ============ grid bots ============ */
+const GKIND = {futures:'合約網格', spot:'現貨網格'}, GDIR = {Long:'做多', Short:'做空', Neutral:'中性'};
+function normGrid(o){
+  if (!o || typeof o !== 'object') return null;
+  const n = v => { const x = parseFloat(v); return Number.isFinite(x) ? x : null; }, str = (v, l = 2000) => String(v ?? '').slice(0, l), re = /^\d{4}-\d\d-\d\dT\d\d:\d\d$/;
+  const g = {id:str(o.id || uid(), 40), coin:str(o.coin, 20).toUpperCase().trim(), kind:o.kind === 'spot' ? 'spot' : 'futures', dir:['Long', 'Short', 'Neutral'].includes(o.dir) ? o.dir : 'Neutral',
+    lev:Math.max(1, Math.round(n(o.lev) || 1)), low:n(o.low), high:n(o.high), grids:Math.max(0, Math.round(n(o.grids) || 0)), invest:n(o.invest),
+    gridProfit:n(o.gridProfit) || 0, posPnl:n(o.posPnl) || 0, fees:n(o.fees) || 0, startAt:str(o.startAt, 16), endAt:re.test(String(o.endAt)) ? o.endAt : null, notes:str(o.notes), demo:!!o.demo, updatedAt:Math.max(0, n(o.updatedAt) || 0)};
+  if (!g.coin || !(g.invest > 0) || !re.test(g.startAt)) return null;
+  return g;
+}
+function calcGrid(g){
+  const net = g.gridProfit + g.posPnl - g.fees, roi = g.invest > 0 ? net / g.invest : null;
+  const end = g.endAt ? new Date(g.endAt) : new Date(), days = Math.max((end - new Date(g.startAt)) / 864e5, 0);
+  const apr = (roi != null && days >= 1) ? roi / days * 365 : null;
+  const width = (g.low > 0 && g.high > g.low) ? (g.high - g.low) / g.low : null, step = (width != null && g.grids > 0) ? width / g.grids : null;
+  return {net, roi, days, apr, width, step};
+}
+function demoGrids(){
+  const s = Date.now(), mk = (coin, kind, dir, lev, low, high, n, inv, ago, dur, gp, pp, fees) => ({id:uid(), demo:true, coin, kind, dir, lev, low, high, grids:n, invest:inv, startAt:toLocal(new Date(s - ago * 864e5)),
+    endAt:dur == null ? null : toLocal(new Date(s - (ago - dur) * 864e5)), gridProfit:gp, posPnl:pp, fees, notes:'示範資料'});
+  return [mk('BTC', 'futures', 'Neutral', 3, 60000, 72000, 60, 500, 45, 20, 38.4, -12.1, 6.2), mk('ETH', 'futures', 'Long', 5, 2900, 3700, 50, 400, 30, 14, 52.7, -30.5, 9.8),
+    mk('SOL', 'spot', 'Neutral', 1, 120, 210, 40, 300, 25, 25, 41.2, 8.4, 2.1), mk('DOGE', 'futures', 'Short', 3, .12, .2, 45, 250, 12, null, 18.9, -6.3, 3.4),
+    mk('BNB', 'spot', 'Neutral', 1, 500, 680, 35, 350, 6, null, 12.5, 3.1, 1)].map(normGrid).filter(Boolean);
+}
+function vGrid(){
+  if (!S.grids.length) return `<div class="card hero-note"><h2>網格機器人紀錄</h2><p>網格的賺錢方式和手動合約不同，所以這裡獨立記帳：記下價格區間、格數、投入與套利收益，追蹤報酬率與年化。</p><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn primary" data-act="new">新增網格</button><button class="btn" data-act="demo">載入範例資料</button></div></div>`;
+  const C = [...S.grids].sort((a, b) => a.startAt < b.startAt ? 1 : -1).map(g => ({g, c:calcGrid(g)})), L = C.map(x => x.g);
+  const tot = sum(L.map(g => g.invest)), net = sum(C.map(x => x.c.net)), gp = sum(L.map(g => g.gridProfit)), pp = sum(L.map(g => g.posPnl)), fees = sum(L.map(g => g.fees));
+  const run = L.filter(g => !g.endAt).length, done = C.filter(x => x.g.endAt), wins = done.filter(x => x.c.net > 0).length;
+  const aprs = done.map(x => x.c.apr).filter(x => x != null), avgApr = aprs.length ? sum(aprs) / aprs.length : null;
+  const byCoin = {}; C.forEach(x => { byCoin[x.g.coin] = (byCoin[x.g.coin] || 0) + x.c.net; });
+  const ck = Object.keys(byCoin).sort((a, b) => byCoin[b] - byCoin[a]);
+  later(() => barChart('ch_gc', ck, ck.map(k => +byCoin[k].toFixed(2)), v => '$' + fmt(v, 0)));
+  const kp = [['總投入', `<b>${usd(tot)}</b>`, `${L.length} 個機器人 · 運行中 ${run}`], ['淨盈虧', `<b class="${sgn(net)}">${money(net)}</b>`, `${pct(tot > 0 ? net / tot : null)} 投入報酬`],
+    ['套利收益', `<b class="${sgn(gp)}">${money(gp)}</b>`, '格內成交累積'], ['持倉盈虧', `<b class="${sgn(pp)}">${money(pp)}</b>`, '方向部位浮動或結算'],
+    ['手續費與資金費', `<b>${usd(fees)}</b>`, gp > 0 ? `占套利收益 ${pct(fees / gp)}` : ''], ['已結束勝率', `<b>${done.length ? pct(wins / done.length, 0) : '—'}</b>`, `${wins} 勝 / ${done.length - wins} 負`],
+    ['平均年化（已結束）', `<b class="${sgn(avgApr)}">${avgApr != null ? pct(avgApr, 0) : '—'}</b>`, '運行滿 1 天才計算'], ['運行中', `<b>${run}</b>`, '尚未填結束時間']]
+    .map(k => `<div class="kpi"><span>${k[0]}</span>${k[1]}<small>${k[2]}</small></div>`).join('');
+  const rows = C.map(({g, c}) => `<tr data-act="gedit" data-id="${g.id}"><td class="num">${fmtDT(g.startAt)}<small>${g.endAt ? '→ ' + fmtDT(g.endAt) : ''}</small></td>
+    <td><b>${esc(g.coin)}</b> <span class="tag">${GKIND[g.kind]}</span><small>${GDIR[g.dir]}${g.kind === 'futures' ? ' · ' + g.lev + 'X' : ''}</small></td>
+    <td class="r num">${g.low != null && g.high != null ? price(g.low) + ' – ' + price(g.high) : '—'}<small>${g.grids ? g.grids + ' 格' : ''}${c.step != null ? ' · 每格 ' + pct(c.step, 2) : ''}</small></td>
+    <td class="r num">$${fmt(g.invest)}</td><td class="r num ${sgn(g.gridProfit)}">${money(g.gridProfit)}</td><td class="r num ${sgn(g.posPnl)}">${money(g.posPnl)}</td><td class="r num">${usd(g.fees)}</td>
+    <td class="r num ${sgn(c.net)}"><b>${money(c.net)}</b><small>${pct(c.roi)}</small></td><td class="r num">${c.apr != null ? pct(c.apr, 0) : '—'}<small>${fmt(c.days, 1)} 天</small></td>
+    <td>${g.endAt ? '<span class="tag">已結束</span>' : '<span class="tag open">運行中</span>'}</td><td class="r" style="white-space:nowrap"><button class="btn sm danger" data-act="gdel" data-id="${g.id}">刪除</button></td></tr>`).join('');
+  return `<div class="alert info"><div><b>獨立記帳</b>網格績效不計入合約的帳戶淨值與統計，避免兩種策略的數字混在一起。</div></div>
+  <div class="strip mb">${kp}</div>
+  <div class="card mb"><h3>各幣種淨盈虧</h3><div class="chart sm"><canvas id="ch_gc"></canvas></div></div>
+  <div class="tw"><table><thead><tr><th>時間</th><th>幣種 / 類型</th><th class="r">價格區間 / 格數</th><th class="r">投入</th><th class="r">套利收益</th><th class="r">持倉盈虧</th><th class="r">費用</th><th class="r">淨盈虧</th><th class="r">年化</th><th>狀態</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function openGridForm(id){
+  const g = id ? S.grids.find(x => x.id === id) : {kind:'futures', dir:'Neutral', lev:3, startAt:nowLocal(), gridProfit:0, posPnl:0, fees:0};
+  if (!g) return;
+  FORM = {shot:null, editId:null, gridId:id || null};
+  openModal(`<div class="dlg" style="max-width:780px"><div class="dh"><h2>${id ? '編輯網格' : '新增網格機器人'}</h2><button class="btn sm" data-act="close">關閉</button></div>
+  <form id="gf" novalidate><div class="db"><div class="fgrid"><div>
+    <div class="fs"><h4>機器人設定</h4>
+      <div class="row2"><div class="field"><label class="fl" for="g_kind">類型</label><select id="g_kind" style="width:100%"><option value="futures" ${g.kind === 'futures' ? 'selected' : ''}>合約網格</option><option value="spot" ${g.kind === 'spot' ? 'selected' : ''}>現貨網格</option></select></div>
+      ${field('幣種', 'g_coin', g.coin, 'text', 'placeholder="BTC" maxlength="20" autocomplete="off" list="dl_coin2"')}</div>
+      <div class="field"><label class="fl">方向</label><div class="seg">${['Long', 'Short', 'Neutral'].map(d => `<label><input type="radio" name="g_dir" value="${d}" ${g.dir === d ? 'checked' : ''}><span>${GDIR[d]}</span></label>`).join('')}</div></div>
+      <div class="row3">${field('槓桿 (X)', 'g_lev', g.lev, 'number', 'min="1" step="1"')}${field('價格下限', 'g_low', g.low, 'number', 'min="0" step="any"')}${field('價格上限', 'g_high', g.high, 'number', 'min="0" step="any"')}</div>
+      <div class="row3">${field('格數', 'g_n', g.grids, 'number', 'min="0" step="1"')}${field('投入本金 (USDT)', 'g_inv', g.invest, 'number', 'min="0" step="any"')}${field('開始時間', 'g_start', g.startAt, 'datetime-local')}</div>
+      ${field('結束時間（留空 = 運行中）', 'g_end', g.endAt || '', 'datetime-local')}</div>
+    <div class="fs"><h4>損益</h4><div class="row3">${field('套利收益', 'g_gp', g.gridProfit, 'number', 'step="any"')}${field('持倉盈虧', 'g_pp', g.posPnl, 'number', 'step="any"')}${field('手續費 + 資金費', 'g_fee', g.fees, 'number', 'min="0" step="any"')}</div></div>
+    <div class="fs"><h4>筆記</h4><textarea id="g_notes" maxlength="2000">${esc(g.notes)}</textarea></div>
+  </div><div><div class="pv" id="gpv"></div></div></div></div>
+  <div class="df"><span id="gerr" class="neg" style="margin-right:auto;align-self:center"></span><button type="button" class="btn" data-act="close">取消</button><button type="submit" class="btn primary">${id ? '儲存變更' : '記錄網格'}</button></div></form>
+  <datalist id="dl_coin2">${[...new Set([...COINS, ...S.trades.map(x => x.coin), ...S.grids.map(x => x.coin)])].map(x => `<option value="${esc(x)}">`).join('')}</datalist></div>`);
+  updateGP();
+}
+function readGrid(){
+  const g = id => $('#' + id).value;
+  return {id:FORM.gridId || uid(), kind:g('g_kind'), dir:$('input[name=g_dir]:checked').value, coin:g('g_coin').trim().toUpperCase(), lev:Math.round(num(g('g_lev')) || 1), low:num(g('g_low')), high:num(g('g_high')),
+    grids:Math.round(num(g('g_n')) || 0), invest:num(g('g_inv')), startAt:g('g_start'), endAt:g('g_end') || null, gridProfit:num(g('g_gp')) || 0, posPnl:num(g('g_pp')) || 0, fees:num(g('g_fee')) || 0, notes:g('g_notes').trim()};
+}
+function updateGP(){
+  const pv = $('#gpv'); if (!pv) return; const g = readGrid();
+  if (!(g.invest > 0) || !g.startAt) { pv.innerHTML = '<h4>即時試算</h4><p class="muted">輸入投入本金與開始時間後，這裡會計算報酬率與年化。</p>'; return; }
+  const c = calcGrid(g), w = [];
+  if (g.low != null && g.high != null && g.low >= g.high) w.push('價格上限必須大於下限');
+  if (g.endAt && g.endAt < g.startAt) w.push('結束時間不能早於開始時間');
+  pv.innerHTML = `<h4>淨盈虧</h4><div class="big ${sgn(c.net)}">${money(c.net)}</div><dl><dt>投入報酬率</dt><dd class="${sgn(c.roi)}">${pct(c.roi)}</dd><dt>運行天數</dt><dd>${fmt(c.days, 1)}</dd>
+    <dt>年化報酬</dt><dd>${c.apr != null ? pct(c.apr, 0) : '運行不足 1 天'}</dd><dt>區間幅度</dt><dd>${c.width != null ? pct(c.width) : '—'}</dd><dt>每格幅度</dt><dd>${c.step != null ? pct(c.step, 2) : '—'}</dd></dl>
+    ${w.length ? `<ul>${w.map(x => `<li class="bad">${esc(x)}</li>`).join('')}</ul>` : ''}`;
+}
+async function submitGrid(e){
+  e.preventDefault();
+  const g = readGrid(), err = m => { $('#gerr').textContent = m; };
+  if (!g.coin) return err('請輸入幣種');
+  if (!(g.invest > 0)) return err('請輸入投入本金');
+  if (!g.startAt) return err('請選擇開始時間');
+  if (g.low != null && g.high != null && g.low >= g.high) return err('價格上限必須大於下限');
+  if (g.endAt && g.endAt < g.startAt) return err('結束時間不能早於開始時間');
+  const old = S.grids.find(x => x.id === g.id); if (old && old.demo) g.demo = true; g.updatedAt = Date.now();
+  const n = normGrid(g); if (!n) return err('資料格式有誤，請檢查欄位');
+  const i = S.grids.findIndex(x => x.id === n.id); if (i >= 0) S.grids[i] = n; else S.grids.push(n);
+  await saveGrids(); closeModal(); render(); toast(old ? '已儲存變更' : '已記錄網格');
+}
 
-            // 帳目狀態 (現改由雲端同步)
-            const [transactions, setTransactions] = useState([]);
-            const [customCategories, setCustomCategories] = useState(() => {
-                const saved = localStorage.getItem('campaign_custom_categories');
-                return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES;
-            });
-            
-            const [activeStage, setActiveStage] = useState('備選期');
-            const [showStatus, setShowStatus] = useState(null);
-            const [showCategoryManager, setShowCategoryManager] = useState(false);
-            const [previewImage, setPreviewImage] = useState(null);
-            const [viewMode, setViewMode] = useState('list');
-            const [searchTerm, setSearchTerm] = useState('');
-            
-            const imageInputRef = useRef(null);
-            
-            const [type, setType] = useState('EXPENSE');
-            const [amount, setAmount] = useState('');
-            const [category, setCategory] = useState(customCategories.EXPENSE[0]);
-            const [note, setNote] = useState('');
-            const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-            const [newCatName, setNewCatName] = useState('');
-            const [receiptImage, setReceiptImage] = useState(null);
+/* ============ trade form ============ */
+function field(label, id, val, type = 'number', extra = ''){ return `<div class="field"><label class="fl" for="${id}">${label}</label><input type="${type}" id="${id}" value="${esc(val ?? '')}" ${extra}></div>`; }
+function openForm(id, preset){
+  const t = id ? S.trades.find(x => x.id === id) : (preset || {dir:'Long', lev:10, openAt:nowLocal(), checks:[], mistakes:[], rating:0, emotion:'冷靜', fees:0, exchange:(S.settings.exchanges[0] || '')});
+  const s = S.settings; FORM = {shot:t.shot || null, editId:id || null};
+  const dl = (name, arr) => `<datalist id="${name}">${[...new Set(arr)].map(x => `<option value="${esc(x)}">`).join('')}</datalist>`;
+  openModal(`<div class="dlg"><div class="dh"><h2>${id ? '編輯交易' : '新增交易'}</h2><button class="btn sm" data-act="close">關閉</button></div>
+  <form id="tf" novalidate><div class="db"><div class="fgrid"><div>
+    <div class="fs"><h4>基本資料</h4>
+      <div class="row2"><div class="field"><label class="fl">方向</label><div class="seg"><label><input type="radio" name="f_dir" value="Long" ${t.dir === 'Long' ? 'checked' : ''}><span>多頭 Long</span></label><label><input type="radio" name="f_dir" value="Short" ${t.dir === 'Short' ? 'checked' : ''}><span>空頭 Short</span></label></div></div>
+      ${field('幣種', 'f_coin', t.coin, 'text', 'list="dl_coin" placeholder="BTC" autocomplete="off" maxlength="20"')}</div>
+      <div class="row3">${field('槓桿 (X)', 'f_lev', t.lev, 'number', 'min="1" step="1"')}${field('倉位價值 (USDT)', 'f_notional', t.notional, 'number', 'min="0" step="any" placeholder="1000"')}${field('手續費 + 資金費 (USDT)', 'f_fees', t.fees ?? 0, 'number', 'min="0" step="any"')}</div>
+      <div class="row3">${field('平台', 'f_ex', t.exchange, 'text', 'list="dl_ex" maxlength="60"')}${field('策略', 'f_str', t.strategy, 'text', 'list="dl_str" maxlength="60"')}
+      <div class="field"><label class="fl" for="f_tf">交易週期</label><select id="f_tf" style="width:100%"><option value="">未填</option>${TFS.map(x => `<option ${t.tf === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div></div></div>
+    <div class="fs"><h4>價格與時間 <span class="muted" style="font-weight:400">· 平倉價留空 = 持倉中</span></h4>
+      <div class="row3">${field('開倉價', 'f_entry', t.entry, 'number', 'min="0" step="any"')}${field('止損價', 'f_sl', t.sl, 'number', 'min="0" step="any"')}${field('止盈價', 'f_tp', t.tp, 'number', 'min="0" step="any"')}</div>
+      <div class="row3">${field('平倉價', 'f_exit', t.exit, 'number', 'min="0" step="any"')}${field('開倉時間', 'f_open', t.openAt, 'datetime-local')}${field('平倉時間', 'f_close', t.closeAt || '', 'datetime-local')}</div></div>
+    <div class="fs"><h4>進場前檢查清單</h4>${s.checklist.map(i => `<label class="chk"><input type="checkbox" class="f_chk" value="${i.id}" ${t.checks.includes(i.id) ? 'checked' : ''}><span>${esc(i.text)}</span></label>`).join('') || '<p class="muted">尚未設定清單，可至設定頁新增</p>'}</div>
+    <div class="fs"><h4>執行品質</h4>
+      <div class="row2"><div class="field"><label class="fl" for="f_emo">交易時情緒</label><select id="f_emo" style="width:100%">${EMOTIONS.map(x => `<option ${t.emotion === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
+      <div class="field"><label class="fl" for="f_rate">執行評分</label><select id="f_rate" style="width:100%"><option value="0">未評分</option>${[1, 2, 3, 4, 5].map(x => `<option value="${x}" ${t.rating === x ? 'selected' : ''}>${'★'.repeat(x)}${'☆'.repeat(5 - x)}</option>`).join('')}</select></div></div>
+      <label class="fl">錯誤標籤 <span style="font-weight:400">（沒有就不選）</span></label><div class="chips">${s.mistakes.map(x => `<label class="chip mis"><input type="checkbox" class="f_mis" value="${esc(x)}" ${t.mistakes.includes(x) ? 'checked' : ''}>${esc(x)}</label>`).join('')}</div></div>
+    <div class="fs"><h4>筆記</h4>
+      <div class="field"><label class="fl" for="f_notes">進場理由與計畫</label><textarea id="f_notes" maxlength="2000">${esc(t.notes)}</textarea></div>
+      <div class="field"><label class="fl" for="f_rev">復盤心得</label><textarea id="f_rev" maxlength="2000">${esc(t.review)}</textarea></div>
+      <div class="field"><label class="fl">圖表截圖</label><button type="button" class="btn sm" data-act="pickshot">選擇圖片</button> <button type="button" class="btn sm danger" data-act="rmshot" id="rmshot" style="${FORM.shot ? '' : 'display:none'}">移除</button><div id="shotbox">${FORM.shot ? `<img class="shot" src="${FORM.shot}" alt="截圖">` : ''}</div></div></div>
+  </div><div><div class="pv" id="pv"></div></div></div></div>
+  <div class="df"><span id="ferr" class="neg" style="margin-right:auto;align-self:center"></span><button type="button" class="btn" data-act="close">取消</button><button type="submit" class="btn primary">${id ? '儲存變更' : '記錄交易'}</button></div></form>
+  ${dl('dl_coin', [...COINS, ...S.trades.map(x => x.coin)])}${dl('dl_ex', [...s.exchanges, ...S.trades.map(x => x.exchange).filter(Boolean)])}${dl('dl_str', [...s.strategies, ...S.trades.map(x => x.strategy).filter(Boolean)])}</div>`);
+  updatePV();
+}
+function readForm(){
+  const g = id => $('#' + id).value, exit = num(g('f_exit'));
+  return {id:FORM.editId || uid(), coin:g('f_coin').trim().toUpperCase(), dir:$('input[name=f_dir]:checked').value, lev:Math.round(num(g('f_lev')) || 0), notional:num(g('f_notional')),
+    entry:num(g('f_entry')), exit, sl:num(g('f_sl')), tp:num(g('f_tp')), fees:num(g('f_fees')) || 0, openAt:g('f_open'), closeAt:exit != null ? (g('f_close') || nowLocal()) : null,
+    exchange:g('f_ex').trim(), strategy:g('f_str').trim(), tf:g('f_tf'), emotion:g('f_emo'), rating:+g('f_rate'), checks:$$('.f_chk:checked').map(x => x.value), mistakes:$$('.f_mis:checked').map(x => x.value),
+    notes:g('f_notes').trim(), review:g('f_rev').trim(), shot:FORM.shot};
+}
+function updatePV(){
+  const pv = $('#pv'); if (!pv) return;
+  const t = readForm(), ok = t.entry > 0 && t.notional > 0 && t.lev > 0;
+  if (!ok) { pv.innerHTML = '<h4>即時試算</h4><p class="muted">輸入開倉價、倉位價值與槓桿後，這裡會即時計算風險與盈虧。</p>'; return; }
+  const c = calc(t), eq = Math.max(S.equity, 1), v = violList(t, c, eq), warns = [];
+  if (c.slWrong) warns.push(['bad', `止損價位置不合理（${t.dir === 'Long' ? '多單止損應低於開倉價' : '空單止損應高於開倉價'}）`]);
+  if (c.tpWrong) warns.push(['bad', `止盈價位置不合理`]);
+  if (t.sl != null && !c.slWrong && c.liq != null && (t.dir === 'Long' ? t.sl <= c.liq : t.sl >= c.liq)) warns.push(['bad', '止損價比估算強平價更遠，會先被強平']);
+  v.forEach(x => warns.push(['bad', x.msg]));
+  if (c.rr != null && c.rr < 1.5) warns.push(['warn', `預期盈虧比僅 ${fmt(c.rr, 2)}，低於 1.5`]);
+  if (!FORM.editId) { const ts = todayStatus(); if (ts.pnl <= -S.settings.rules.maxDailyLoss) warns.push(['bad', '今日虧損已達上限，建議不要再開倉']); else if (ts.opened >= S.settings.rules.maxTradesPerDay) warns.push(['warn', `今日已開 ${ts.opened} 筆，達到筆數上限`]); }
+  if (!warns.length && t.sl != null) warns.push(['ok', '符合所有風控規則']);
+  const head = c.net != null ? `<div class="big ${sgn(c.net)}">${money(c.net)}</div>` : `<div class="big muted">持倉中</div>`;
+  pv.innerHTML = `<h4>${c.net != null ? '實際淨盈虧' : '即時試算'}</h4>${head}<dl>
+    <dt>合約數量</dt><dd>${fmt(c.size, 4)}</dd><dt>保證金</dt><dd>$${fmt(c.margin)}</dd><dt>估算強平價</dt><dd>${price(c.liq)}</dd>
+    <dt>止損風險</dt><dd>${c.risk != null ? usd(c.risk) + ' (' + fmt(c.risk / eq * 100, 2) + '%)' : '未設定'}</dd><dt>預期盈虧比</dt><dd>${c.rr != null ? fmt(c.rr, 2) : '—'}</dd>
+    ${c.net != null ? `<dt>毛盈虧</dt><dd class="${sgn(c.gross)}">${money(c.gross)}</dd><dt>R 倍數</dt><dd class="${sgn(c.R)}">${c.R != null ? fmt(c.R, 2) + 'R' : '—'}</dd><dt>保證金報酬率</dt><dd class="${sgn(c.roi)}">${pct(c.roi)}</dd>` : ''}</dl>
+    ${warns.length ? `<ul>${warns.map(w => `<li class="${w[0]}">${esc(w[1])}</li>`).join('')}</ul>` : ''}`;
+}
+async function submitForm(e){
+  e.preventDefault();
+  const t = readForm(), err = m => { $('#ferr').textContent = m; };
+  if (!t.coin) return err('請輸入幣種');
+  if (!(t.lev >= 1)) return err('槓桿至少為 1');
+  if (!(t.notional > 0)) return err('請輸入倉位價值');
+  if (!(t.entry > 0)) return err('請輸入開倉價');
+  if (!t.openAt) return err('請選擇開倉時間');
+  if (t.exit != null && !(t.exit > 0)) return err('平倉價必須大於 0');
+  if (t.exit != null && t.closeAt < t.openAt) return err('平倉時間不能早於開倉時間');
+  const old = S.trades.find(x => x.id === t.id); if (old && old.demo) t.demo = true; t.updatedAt = Date.now();
+  const n = norm(t); if (!n) return err('資料格式有誤，請檢查欄位');
+  const i = S.trades.findIndex(x => x.id === n.id); if (i >= 0) S.trades[i] = n; else S.trades.push(n);
+  await persist(() => IDB.put(n));
+  recompute(); closeModal(); render(); toast(old ? '已儲存變更' : '已記錄交易');
+}
+function resizeShot(file){
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => { const im = new Image(); im.onload = () => { const k = Math.min(1, 900 / im.width), cv = document.createElement('canvas'); cv.width = im.width * k; cv.height = im.height * k; cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height); const out = cv.toDataURL('image/jpeg', .6); if (out.length > 700000) rej(new Error('big')); else res(out); }; im.onerror = rej; im.src = fr.result; };
+    fr.onerror = rej; fr.readAsDataURL(file);
+  });
+}
 
-            // 1. 監聽登入狀態
-            useEffect(() => {
-                const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-                    setUser(currentUser);
-                    setIsAuthLoading(false);
-                    if (!currentUser) setDbStatus('未登入');
-                });
-                return () => unsubscribe();
-            }, []);
+/* ============ detail ============ */
+function openDetail(id){
+  const t = S.trades.find(x => x.id === id); if (!t) return; const d = S.D[t.id], items = S.settings.checklist;
+  openModal(`<div class="dlg"><div class="dh"><h2>${esc(t.coin)} <span class="tag ${t.dir === 'Long' ? 'long' : 'short'}">${t.dir === 'Long' ? '多' : '空'} ${t.lev}X</span> ${t.exit == null ? '<span class="tag open">持倉中</span>' : ''}</h2><button class="btn sm" data-act="close">關閉</button></div>
+  <div class="db"><div class="kv">
+    <div><span>淨盈虧</span><b class="${sgn(d.net)}">${d.net != null ? money(d.net) : '持倉中'}</b></div><div><span>R 倍數</span><b class="${sgn(d.R)}">${d.R != null ? fmt(d.R, 2) + 'R' : '—'}</b></div>
+    <div><span>保證金報酬率</span><b class="${sgn(d.roi)}">${pct(d.roi)}</b></div><div><span>持倉時間</span><b>${fmtDur(d.hold)}</b></div>
+    <div><span>倉位價值 / 數量</span><b>$${fmt(t.notional)} / ${fmt(d.size, 4)}</b></div><div><span>開倉 → 平倉</span><b>${price(t.entry)} → ${price(t.exit)}</b></div>
+    <div><span>止損 / 止盈</span><b>${price(t.sl)} / ${price(t.tp)}</b></div><div><span>手續費與資金費</span><b>${usd(t.fees)}</b></div>
+    <div><span>風險金額</span><b>${d.risk != null ? usd(d.risk) + ' (' + fmt(d.risk / d.eq * 100, 2) + '%)' : '未設定'}</b></div><div><span>預期盈虧比</span><b>${d.rr != null ? fmt(d.rr, 2) : '—'}</b></div>
+    <div><span>平台 / 策略</span><b>${esc(t.exchange) || '—'} / ${esc(t.strategy) || '—'}</b></div><div><span>週期 / 情緒 / 評分</span><b>${esc(t.tf) || '—'} / ${esc(t.emotion) || '—'} / ${t.rating ? '★'.repeat(t.rating) : '—'}</b></div>
+    <div><span>開倉時間</span><b>${fmtDT(t.openAt)}</b></div><div><span>平倉時間</span><b>${fmtDT(t.closeAt)}</b></div></div>
+  ${t.exit != null ? `<div class="alert ${d.compliant ? 'info' : 'bad'}"><div><b>${d.compliant ? '這筆交易符合紀律' : '這筆交易有違規'}</b>${[...t.mistakes, ...d.viol.map(v => v.msg)].length ? '：' + esc([...t.mistakes, ...d.viol.map(v => v.msg)].join('、')) : ''}</div></div>` : ''}
+  <div class="fs"><h4>進場前檢查清單 ${d.chk != null ? `<span class="muted" style="font-weight:400">· 完成 ${pct(d.chk, 0)}</span>` : ''}</h4>${items.map(i => `<div class="chk" style="cursor:default"><span class="${t.checks.includes(i.id) ? 'pos' : 'neg'}">${t.checks.includes(i.id) ? '✓' : '✗'}</span><span>${esc(i.text)}</span></div>`).join('') || '<span class="muted">未設定清單</span>'}</div>
+  ${t.notes ? `<div class="fs"><h4>進場理由與計畫</h4><div class="note">${esc(t.notes)}</div></div>` : ''}${t.review ? `<div class="fs"><h4>復盤心得</h4><div class="note">${esc(t.review)}</div></div>` : ''}
+  ${t.shot ? `<div class="fs"><h4>圖表截圖</h4><img class="shot" src="${t.shot}" data-act="img" alt="截圖"></div>` : ''}</div>
+  <div class="df"><button class="btn danger" data-act="del" data-id="${t.id}">刪除</button><button class="btn" data-act="dup" data-id="${t.id}">複製為新交易</button><button class="btn primary" data-act="edit" data-id="${t.id}">${t.exit == null ? '編輯 / 平倉' : '編輯'}</button></div></div>`);
+}
 
-            // 處理登入/註冊
-            const handleAuth = async (e) => {
-                e.preventDefault();
-                setAuthError('');
-                setIsAuthLoading(true);
-                try {
-                    if (isRegistering) {
-                        await createUserWithEmailAndPassword(auth, email, password);
-                    } else {
-                        await signInWithEmailAndPassword(auth, email, password);
-                    }
-                } catch (error) {
-                    console.error(error);
-                    // 翻譯常見的 Firebase 錯誤訊息
-                    let errorMsg = "發生錯誤，請稍後再試。";
-                    if (error.code === 'auth/invalid-email') errorMsg = '無效的電子郵件格式。';
-                    else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') errorMsg = '帳號或密碼錯誤。';
-                    else if (error.code === 'auth/email-already-in-use') errorMsg = '此電子郵件已被註冊過。';
-                    else if (error.code === 'auth/weak-password') errorMsg = '密碼太弱，請至少輸入 6 個字元。';
-                    setAuthError(errorMsg);
-                    setIsAuthLoading(false);
-                }
-            };
+/* ============ data actions ============ */
+function csvExport(){
+  const head = ['狀態','幣種','方向','槓桿','倉位價值','數量','開倉價','平倉價','止損','止盈','費用','毛盈虧','淨盈虧','保證金報酬率','R倍數','開倉時間','平倉時間','平台','策略','週期','情緒','評分','錯誤標籤','違規','清單完成率','進場計畫','復盤'];
+  const q = v => { const s = String(v ?? ''); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const tx = v => { const s = String(v ?? ''); return /^[=+\-@\t\r]/.test(s) ? "'" + s : s; };
+  const r = (n, d = 4) => n == null ? '' : +n.toFixed(d);
+  const rows = [...S.trades].sort((a, b) => a.openAt < b.openAt ? -1 : 1).map(t => { const d = S.D[t.id];
+    return [t.exit == null ? '持倉中' : '已平倉', tx(t.coin), t.dir, t.lev, t.notional, r(d.size, 6), t.entry, t.exit ?? '', t.sl ?? '', t.tp ?? '', t.fees, r(d.gross, 4), r(d.net, 4), r(d.roi, 4), r(d.R, 3), t.openAt, t.closeAt ?? '', tx(t.exchange), tx(t.strategy), t.tf, t.emotion, t.rating || '', tx(t.mistakes.join('|')), tx(d.viol.map(v => v.msg).join('|')), d.chk != null ? r(d.chk, 2) : '', tx(t.notes), tx(t.review)].map(q).join(','); });
+  download('\ufeff' + head.join(',') + '\r\n' + rows.join('\r\n'), `trades-${today()}.csv`, 'text/csv;charset=utf-8');
+  toast('已匯出 CSV');
+}
+function jsonExport(){
+  download(JSON.stringify({app:'tradeledger-pro', version:1, exportedAt:new Date().toISOString(), settings:S.settings, trades:S.trades, grids:S.grids}, null, 1), `tradeledger-backup-${today()}.json`, 'application/json');
+  toast('已匯出備份');
+}
+async function jsonImport(file){
+  try {
+    const data = JSON.parse(await file.text()); if (!data || !Array.isArray(data.trades)) throw new Error('bad');
+    const ts = data.trades.map(norm).filter(Boolean);
+    if (!(await confirmBox('匯入備份', `找到 ${ts.length} 筆有效交易。相同 ID 的紀錄會被覆蓋，其餘會合併；備份中的設定也會一併套用。`, '匯入'))) return;
+    ts.forEach(n => { const i = S.trades.findIndex(x => x.id === n.id); if (i >= 0) S.trades[i] = n; else S.trades.push(n); });
+    if (Array.isArray(data.grids)) { data.grids.map(normGrid).filter(Boolean).forEach(n => { const i = S.grids.findIndex(x => x.id === n.id); if (i >= 0) S.grids[i] = n; else S.grids.push(n); }); await saveGrids(); }
+    if (data.settings && typeof data.settings === 'object') S.settings = mergeSettings(data.settings);
+    await persist(() => IDB.putMany(ts)); await saveSettings();
+    recompute(); applyTheme(); render(); toast(`已匯入 ${ts.length} 筆交易`);
+  } catch (e) { toast('匯入失敗：檔案格式不正確'); }
+}
+function mergeSettings(o){
+  const d = JSON.parse(JSON.stringify(DEFAULTS)), s = {...d, ...o, rules:{...d.rules, ...(o.rules || {})}};
+  ['checklist','mistakes','strategies','exchanges'].forEach(k => { if (!Array.isArray(s[k])) s[k] = d[k]; });
+  s.capital = num(s.capital) > 0 ? num(s.capital) : d.capital; return s;
+}
+function demoTrades(){
+  let seed = 20260101; const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const pick = a => a[Math.floor(rnd() * a.length)], P = x => +x.toPrecision(6);
+  const coins = {BTC:68000, ETH:3400, SOL:165, BNB:590, XRP:.55, DOGE:.16}, cap = S.settings.capital, s = S.settings, out = [], start = Date.now() - 80 * 864e5;
+  for (let i = 0; i < 88; i++) {
+    const coin = pick(Object.keys(coins)), entry = P(coins[coin] * (.85 + rnd() * .3)), dir = rnd() < .55 ? 'Long' : 'Short', bad = rnd() < .22, d = dir === 'Long' ? 1 : -1;
+    const lev = bad && rnd() < .5 ? pick([30, 50]) : pick([3, 5, 10, 10, 15, 20]), slPct = .008 + rnd() * .02;
+    const risk = cap * (.008 + rnd() * .012) * (bad && rnd() < .4 ? 2 : 1);
+    const notional = Math.round(Math.min(risk / slPct, cap * lev * .9));
+    const rr = 1.2 + rnd() * 2.3, win = rnd() < (bad ? .3 : .57);
+    const R = win ? .6 + rnd() * (rr - .6) : -(.6 + rnd() * .5) - (bad && rnd() < .3 ? rnd() * 1.2 : 0);
+    const open = new Date(start + i * (80 / 88) * 864e5 + rnd() * 20 * 36e5), hold = .3 + rnd() * 30, close = new Date(open.getTime() + hold * 36e5);
+    if (close > new Date()) continue;
+    out.push({id:uid(), demo:true, coin, dir, lev, notional, entry, sl:P(entry * (1 - d * slPct)), tp:P(entry * (1 + d * slPct * rr)), exit:P(entry * (1 + d * slPct * R)),
+      fees:+(notional * .0011 + (hold > 8 ? notional * .0001 * Math.floor(hold / 8) : 0)).toFixed(2), openAt:toLocal(open), closeAt:toLocal(close), exchange:pick(s.exchanges), strategy:pick(s.strategies), tf:pick(['15m', '1h', '4h']),
+      emotion:bad ? pick(['FOMO', '貪婪', '恐懼', '報復', '疲憊']) : pick(['冷靜', '冷靜', '自信', '猶豫']), rating:bad ? 1 + Math.floor(rnd() * 2) : 3 + Math.floor(rnd() * 3),
+      checks:bad ? s.checklist.filter(() => rnd() < .5).map(x => x.id) : s.checklist.map(x => x.id), mistakes:bad ? [pick(s.mistakes)] : [],
+      notes:bad ? '情緒化進場，沒有等收線確認。' : '依計畫進場，止損放在結構低點下方，目標為前高。', review:bad ? '重點是等訊號出現再動手，不要追價。' : (win ? '執行到位，按計畫出場。' : '止損出場，單純的成本，不需自責。')});
+  }
+  [['ETH', 'Long'], ['SOL', 'Short']].forEach(([coin, dir]) => { const entry = P(coins[coin] * (.95 + rnd() * .1)), d = dir === 'Long' ? 1 : -1; out.push({id:uid(), demo:true, coin, dir, lev:10, notional:Math.round(cap * 2), entry, sl:P(entry * (1 - d * .015)), tp:P(entry * (1 + d * .04)), exit:null, fees:0, openAt:toLocal(new Date(Date.now() - rnd() * 20 * 36e5)), closeAt:null, exchange:s.exchanges[0], strategy:s.strategies[0], tf:'1h', emotion:'冷靜', rating:0, checks:s.checklist.map(x => x.id), mistakes:[], notes:'示範持倉', review:''}); });
+  return out.map(norm).filter(Boolean);
+}
 
-            const handleSignOut = () => {
-                if(window.confirm('確定要登出嗎？')) {
-                    signOut(auth);
-                }
-            };
+/* ============ actions ============ */
+const ACT = {
+  new:() => S.view === 'grid' ? openGridForm() : openForm(), gedit:(el, id) => openGridForm(id),
+  gdel:async (el, id) => { if (!(await confirmBox('刪除這個網格紀錄？', '刪除後無法復原。', '刪除', true))) return; S.grids = S.grids.filter(x => x.id !== id); await saveGrids(); render(); toast('已刪除'); }, close:() => closeModal(), view:(el, id) => openDetail(id), edit:(el, id) => { openForm(id); },
+  dup:(el, id) => { const t = S.trades.find(x => x.id === id); openForm(null, {...t, id:null, exit:null, closeAt:null, openAt:nowLocal(), review:'', shot:null, mistakes:[], checks:[], rating:0, fees:0, demo:false}); },
+  del:async (el, id) => {
+    if (!(await confirmBox('刪除這筆交易？', '刪除後無法復原。', '刪除', true))) return;
+    S.trades = S.trades.filter(x => x.id !== id); await persist(() => IDB.del(id)); recompute(); closeModal(); render(); toast('已刪除');
+  },
+  nav:(el) => { go(el.dataset.v); }, more:() => { S.limit += 50; renderRows(); }, clrdate:() => { S.f.date = ''; render(); },
+  day:(el) => { S.f.date = el.dataset.d; S.f.status = 'all'; go('trades'); },
+  calprev:() => { S.cal = new Date(S.cal.getFullYear(), S.cal.getMonth() - 1, 1); render(); },
+  calnext:() => { S.cal = new Date(S.cal.getFullYear(), S.cal.getMonth() + 1, 1); render(); },
+  caltoday:() => { S.cal = new Date(); render(); },
+  cloud:openCloud, syncnow:() => { scheduleSync(0); toast('開始同步'); },
+  amode:() => { FB.mode = FB.mode === 'signup' ? 'signin' : 'signup'; openCloud(); },
+  google:async () => { try { await FB.A.signInWithPopup(FB.auth, new FB.A.GoogleAuthProvider()); closeModal(); toast('登入成功，正在同步'); } catch (e) { const el = $('#aerr'); if (el) el.textContent = authMsg(e); } },
+  reset:async () => { const em = $('#a_email').value.trim(); if (!em) { $('#aerr').textContent = '請先輸入 Email'; return; } try { await FB.A.sendPasswordResetEmail(FB.auth, em); toast('已寄出重設密碼信'); } catch (e) { $('#aerr').textContent = authMsg(e); } },
+  logout:async () => {
+    if (!(await confirmBox('登出並清除本機資料？', '資料已保存在雲端，登入後會自動還原。登出會清除這台裝置上的本機副本，避免他人在共用電腦看到。', '登出', true))) return;
+    clearTimeout(FB.t); await cloudFlush();
+    if (FB.status === 'error') { toast('尚有資料未同步成功，請連線正常後再登出'); return; }
+    closeModal(); await FB.A.signOut(FB.auth);
+    S.trades = []; S.grids = []; S.settings = mergeSettings({});
+    try { await IDB.clear(); await IDB.setKV('grids', []); await IDB.setKV('settings', S.settings); await IDB.setKV('owner', null); } catch (_) {}
+    recompute(); applyTheme(); render(); toast('已登出');
+  },
+  csv:csvExport, json:jsonExport, import:() => $('#importFile').click(),
+  pickshot:() => $('#shotFile').click(),
+  rmshot:() => { FORM.shot = null; $('#shotbox').innerHTML = ''; $('#rmshot').style.display = 'none'; },
+  img:(el) => { const c = $('#confirm'); c.innerHTML = `<img src="${el.src}" style="max-width:96vw;max-height:92vh;border-radius:10px;cursor:zoom-out" alt="截圖">`; c.classList.add('show'); c.onclick = () => { c.classList.remove('show'); c.innerHTML = ''; c.onclick = null; }; },
+  demo:async () => {
+    if (!(await confirmBox('載入範例資料', '將加入約 90 筆示範交易（可隨時一鍵移除），不會影響你自己的紀錄。', '載入'))) return;
+    const d = demoTrades(), dg = demoGrids(); S.trades.push(...d); S.grids.push(...dg); await persist(() => IDB.putMany(d)); await saveGrids(); recompute(); render(); toast(`已載入 ${d.length} 筆合約與 ${dg.length} 個網格範例`);
+  },
+  rmdemo:async () => { const ids = S.trades.filter(t => t.demo).map(t => t.id); S.trades = S.trades.filter(t => !t.demo); S.grids = S.grids.filter(g => !g.demo); await saveGrids(); await persist(() => IDB.delMany(ids)); recompute(); render(); toast('已移除範例資料'); },
+  wipe:async () => {
+    if (!(await confirmBox('清除全部資料？', '所有交易紀錄與設定都會被刪除且無法復原（若已登入，雲端資料也會一併刪除），建議先匯出備份。', '全部清除', true))) return;
+    S.trades = []; S.grids = []; S.settings = mergeSettings({}); await persist(() => IDB.clear()); await saveSettings(); await saveGrids(); recompute(); applyTheme(); render(); toast('已清除');
+  },
+  add:(el) => {
+    const k = el.dataset.k, inp = $('#add_' + k), v = inp.value.trim(); if (!v) return;
+    const list = S.settings[k];
+    if (k === 'checklist') list.push({id:uid(), text:v}); else if (!list.includes(v)) list.push(v);
+    saveSettings(); recompute(); render();
+  },
+  rm:(el) => { const list = S.settings[el.dataset.k]; list.splice(+el.dataset.i, 1); saveSettings(); recompute(); render(); }
+};
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  if (el.tagName === 'A') e.preventDefault();
+  const fn = ACT[el.dataset.act]; if (fn) fn(el, el.dataset.id || (el.closest('[data-id]') || {dataset:{}}).dataset.id, e);
+});
+document.addEventListener('submit', e => { if (e.target.id === 'tf') submitForm(e); if (e.target.id === 'gf') submitGrid(e); if (e.target.id === 'af') authSubmit(e); });
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (el.closest('#tf')) updatePV();
+  if (el.closest('#gf')) updateGP();
+  if (el.dataset && el.dataset.f === 'q') { S.f.q = el.value; S.limit = 50; renderRows(); }
+});
+document.addEventListener('change', async e => {
+  const el = e.target;
+  if (el.closest('#tf')) updatePV();
+  if (el.closest('#gf')) updateGP();
+  if (el.dataset.f) { S.f[el.dataset.f] = el.value; S.limit = 50; render(); }
+  else if (el.dataset.s) { S[el.dataset.s] = el.value; render(); }
+  else if (el.dataset.set) {
+    const path = el.dataset.set.split('.'), key = path.pop(); let o = S.settings; path.forEach(p => o = o[p]);
+    let v = el.type === 'checkbox' ? el.checked : el.type === 'number' ? num(el.value) : el.value.trim();
+    if (el.type === 'number' && (v == null || v < (+el.min || 0))) { toast('數值無效'); render(); return; }
+    o[key] = v; await saveSettings(); recompute(); applyTheme(); render(); toast('設定已儲存');
+  }
+  if (el.id === 'importFile' && el.files[0]) { await jsonImport(el.files[0]); el.value = ''; }
+  if (el.id === 'shotFile' && el.files[0]) {
+    try { FORM.shot = await resizeShot(el.files[0]); $('#shotbox').innerHTML = `<img class="shot" src="${FORM.shot}" alt="截圖">`; $('#rmshot').style.display = ''; } catch (_) { toast('圖片讀取失敗'); }
+    el.value = '';
+  }
+});
+$('#modal').addEventListener('mousedown', e => { if (e.target.id === 'modal' && !$('#tf')) closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if ($('#confirm').classList.contains('show')) $('#confirm').classList.remove('show'); else closeModal(); } });
+$('#rangeSel').addEventListener('change', e => { S.range = e.target.value; render(); });
+$('#themeBtn').addEventListener('click', () => { const o = ['auto', 'light', 'dark'], s = S.settings; s.theme = o[(o.indexOf(s.theme) + 1) % 3]; saveSettings(); applyTheme(); render(); toast('主題：' + {auto:'跟隨系統', light:'淺色', dark:'深色'}[s.theme]); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (S.settings.theme === 'auto') { applyTheme(); render(); } });
 
-            // 2. 監聽 Firestore 雲端資料 (雙向綁定)
-            useEffect(() => {
-                if (!user) {
-                    setTransactions([]); // 未登入時清空畫面資料
-                    return;
-                }
-                setDbStatus('同步中...');
+/* ============ shell ============ */
+function applyTheme(){ const t = S.settings.theme; document.documentElement.dataset.theme = (t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches)) ? 'dark' : 'light'; }
+function go(v){ S.view = v; closeModal(); window.scrollTo(0, 0); render(); }
+function buildNav(){
+  $('#nav').innerHTML = NAV.map(([k, n]) => `<button data-k="${k}">${svg(k)}${n}</button>`).join('');
+  $('#bnav').innerHTML = NAV.map(([k, n]) => `<button data-k="${k}">${svg(k)}<span>${n}</span></button>`).join('');
+  [$('#nav'), $('#bnav')].forEach(el => el.addEventListener('click', e => { const b = e.target.closest('button'); if (b) go(b.dataset.k); }));
+}
+function chrome(){
+  $$('#nav button,#bnav button').forEach(b => b.classList.toggle('on', b.dataset.k === S.view));
+  const nm = S.settings.brand || 'TradeLedger Pro';
+  $('#brandName').textContent = nm; document.title = nm + ' · 合約交易日誌';
+  $('#brandSub').textContent = S.settings.trader || '合約交易日誌';
+  $('#title').textContent = NAV.find(n => n[0] === S.view)[1];
+  $('#subtitle').textContent = SUB[S.view];
+  const e = $('#eqMini'); e.textContent = '$' + fmt(S.equity); e.className = 'num';
+  const rs = $('#rangeSel'); rs.style.display = ['dashboard', 'analytics', 'discipline'].includes(S.view) ? '' : 'none'; rs.value = S.range; chromeCloud();
+}
+function render(){
+  charts.forEach(c => c.destroy()); charts = []; LATER = [];
+  const v = {dashboard:vDashboard, trades:vTrades, analytics:vAnalytics, discipline:vDiscipline, calendar:vCalendar, grid:vGrid, settings:vSettings}[S.view];
+  const y = window.scrollY; $('#view').innerHTML = v(); LATER.forEach(f => f()); chrome(); window.scrollTo(0, y);
+}
 
-                const colRef = collection(db, getDbPath(user.uid));
-                
-                // onSnapshot 會自動即時抓取雲端變化
-                const unsubscribe = onSnapshot(colRef, (snapshot) => {
-                    const data = [];
-                    snapshot.forEach(doc => {
-                        data.push({ dbId: doc.id, ...doc.data() });
-                    });
-                    
-                    // 在前端進行排序
-                    data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || new Date(b.createdAt) - new Date(a.createdAt));
-                    setTransactions(data);
-                    setDbStatus('已與雲端同步');
-                }, (error) => {
-                    console.error("資料讀取錯誤:", error);
-                    setDbStatus('權限不足或同步錯誤');
-                });
+/* ============ cloud (Firebase) ============ */
+const FIREBASE_CONFIG = {
+  apiKey:"AIzaSyCbxaKqQtSNmOSUVJ-83SdPU3Q9ylBItjo", authDomain:"new-chang-2dd24.firebaseapp.com", projectId:"new-chang-2dd24",
+  storageBucket:"new-chang-2dd24.firebasestorage.app", messagingSenderId:"432512373769", appId:"1:432512373769:web:528ec757749fdbda9854d8", measurementId:"G-JM4M73E28M"
+};
+const FBV = 'https://www.gstatic.com/firebasejs/11.6.1/';
+const FB = {ready:false, failed:false, user:null, status:'off', detail:'', sig:{trades:{}, grids:{}, settings:undefined}, unsubs:[], mode:'signin', settingsReady:false, busy:false, dirty:false, t:null};
+const SIGS = new WeakMap();
+const sigOf = o => { let s = SIGS.get(o); if (s === undefined) { s = JSON.stringify(o); SIGS.set(o, s); } return s; };
+function setSync(st, detail){ FB.status = st; FB.detail = detail || ''; chromeCloud(); }
+function chromeCloud(){
+  const b = $('#cloudBtn'); if (!b) return;
+  if (!FIREBASE_CONFIG.apiKey) { b.style.display = 'none'; return; }
+  if (FB.failed) { b.textContent = '雲端離線'; return; }
+  if (!FB.ready) { b.textContent = '雲端…'; return; }
+  if (!FB.user) { b.textContent = '登入'; return; }
+  b.textContent = {syncing:'同步中…', ok:'☁ 已同步', error:'⚠ 同步失敗', off:'☁'}[FB.status] || '☁';
+}
+function scheduleSync(ms = 500){ if (!FB.ready || !FB.user) return; clearTimeout(FB.t); FB.t = setTimeout(cloudFlush, ms); }
+async function fbInit(){
+  if (!FIREBASE_CONFIG.apiKey) return;
+  try {
+    const [m, a, f] = await Promise.all([import(FBV + 'firebase-app.js'), import(FBV + 'firebase-auth.js'), import(FBV + 'firebase-firestore.js')]);
+    FB.A = a; FB.F = f; FB.app = m.initializeApp(FIREBASE_CONFIG); FB.auth = a.getAuth(FB.app); FB.db = f.getFirestore(FB.app); FB.ready = true;
+    a.onAuthStateChanged(FB.auth, onUser);
+  } catch (e) { FB.failed = true; console.error(e); }
+  chromeCloud();
+}
+async function onUser(user){
+  FB.unsubs.forEach(u => u()); FB.unsubs = []; FB.sig = {trades:{}, grids:{}, settings:undefined}; FB.settingsReady = false; FB.user = user || null;
+  if (!user) { setSync('off'); return; }
+  try {
+    let owner = null; try { owner = await IDB.getKV('owner'); } catch (_) {}
+    if (owner && owner !== user.uid) {
+      S.trades = []; S.grids = []; S.settings = mergeSettings({});
+      try { await IDB.clear(); await IDB.setKV('grids', []); await IDB.setKV('settings', S.settings); } catch (_) {}
+      recompute(); applyTheme(); render();
+    }
+    try { await IDB.setKV('owner', user.uid); } catch (_) {}
+  } catch (_) {}
+  setSync('syncing');
+  const {collection, doc, onSnapshot} = FB.F, err = e => { console.error(e); setSync('error', e.code || ''); };
+  FB.unsubs.push(onSnapshot(collection(FB.db, 'users', user.uid, 'trades'), s => applyRemote('trades', s), err));
+  FB.unsubs.push(onSnapshot(collection(FB.db, 'users', user.uid, 'grids'), s => applyRemote('grids', s), err));
+  FB.unsubs.push(onSnapshot(doc(FB.db, 'users', user.uid, 'meta', 'settings'), applySettings, err));
+}
+function applyRemote(kind, snap){
+  const arr = kind === 'trades' ? S.trades : S.grids, nf = kind === 'trades' ? norm : normGrid, known = FB.sig[kind], put = [], del = [];
+  snap.docChanges().forEach(ch => {
+    const id = ch.doc.id, i = arr.findIndex(x => x.id === id);
+    if (ch.type === 'removed') { delete known[id]; if (i >= 0) { arr.splice(i, 1); del.push(id); } return; }
+    const r = nf({...ch.doc.data(), id}); if (!r) return;
+    const loc = i >= 0 ? arr[i] : null;
+    if (loc) {
+      const ls = sigOf(loc), rs = sigOf(r);
+      if (ls === rs) { known[id] = rs; return; }
+      if (known[id] !== undefined ? ls !== known[id] : (loc.updatedAt || 0) > (r.updatedAt || 0)) return;
+    }
+    if (i >= 0) arr[i] = r; else arr.push(r);
+    known[id] = sigOf(r); put.push(r);
+  });
+  if (put.length || del.length) {
+    (async () => { try { if (kind === 'trades') { if (put.length) await IDB.putMany(put); if (del.length) await IDB.delMany(del); } else await IDB.setKV('grids', S.grids); } catch (_) {} })();
+    recompute(); render();
+  }
+  scheduleSync();
+}
+function applySettings(snap){
+  if (snap.exists()) {
+    const r = mergeSettings(snap.data()), rs = JSON.stringify(r), ls = JSON.stringify(S.settings);
+    if (rs !== ls && !(FB.sig.settings !== undefined && ls !== FB.sig.settings)) {
+      S.settings = r; try { IDB.setKV('settings', r); } catch (_) {}
+      applyTheme(); recompute(); render();
+    }
+    FB.sig.settings = rs;
+  }
+  FB.settingsReady = true; scheduleSync();
+}
+async function cloudFlush(){
+  if (!FB.ready || !FB.user) return;
+  if (FB.busy) { FB.dirty = true; return; }
+  FB.busy = true; setSync('syncing');
+  const uid = FB.user.uid, F = FB.F;
+  try {
+    const ops = [];
+    for (const [kind, arr] of [['trades', S.trades], ['grids', S.grids]]) {
+      const known = FB.sig[kind], ids = new Set();
+      arr.forEach(o => { ids.add(o.id); const s = sigOf(o); if (known[o.id] !== s) ops.push({k:kind, id:o.id, o, s}); });
+      Object.keys(known).forEach(id => { if (!ids.has(id)) ops.push({k:kind, id, del:true}); });
+    }
+    for (let i = 0; i < ops.length; i += 20) {
+      if (!FB.user || FB.user.uid !== uid) break;
+      const ch = ops.slice(i, i + 20), b = F.writeBatch(FB.db);
+      ch.forEach(op => { const ref = F.doc(FB.db, 'users', uid, op.k, op.id); if (op.del) b.delete(ref); else b.set(ref, op.o); });
+      await b.commit();
+      ch.forEach(op => { if (op.del) delete FB.sig[op.k][op.id]; else FB.sig[op.k][op.id] = op.s; });
+    }
+    const ss = JSON.stringify(S.settings);
+    if (FB.settingsReady && FB.sig.settings !== ss && FB.user && FB.user.uid === uid) { await F.setDoc(F.doc(FB.db, 'users', uid, 'meta', 'settings'), JSON.parse(ss)); FB.sig.settings = ss; }
+    setSync('ok');
+  } catch (e) { console.error(e); setSync('error', e.code || ''); }
+  FB.busy = false;
+  if (FB.dirty) { FB.dirty = false; scheduleSync(); }
+}
+function authMsg(e){
+  const m = {'auth/invalid-credential':'Email 或密碼不正確', 'auth/wrong-password':'密碼不正確', 'auth/user-not-found':'找不到此帳號', 'auth/email-already-in-use':'這個 Email 已經註冊過', 'auth/weak-password':'密碼至少需要 6 個字元',
+    'auth/invalid-email':'Email 格式不正確', 'auth/too-many-requests':'嘗試次數過多，請稍後再試', 'auth/network-request-failed':'網路連線失敗', 'auth/popup-closed-by-user':'已取消登入', 'auth/popup-blocked':'瀏覽器擋住了登入視窗',
+    'auth/operation-not-allowed':'尚未在 Firebase 後台啟用此登入方式', 'auth/unauthorized-domain':'目前網域尚未加入 Firebase 授權網域，請改用 Hosting 網址或 localhost', 'auth/operation-not-supported-in-this-environment':'目前環境不支援此登入方式，請用 http(s) 網址開啟'};
+  return m[e.code] || ('登入失敗：' + (e.code || e.message));
+}
+function authHTML(){
+  const su = FB.mode === 'signup';
+  return `<div class="dlg sm" style="max-width:420px"><h3>${su ? '註冊帳號' : '登入'}</h3><p>${su ? '建立帳號後，你的交易紀錄會同步到雲端，換裝置也能使用。' : '登入後，交易紀錄會在你的所有裝置同步，這台裝置上現有的資料會一併上傳。'}</p>
+  <form id="af" novalidate><div class="field"><label class="fl" for="a_email">Email</label><input type="text" id="a_email" autocomplete="email" inputmode="email"></div>
+  <div class="field"><label class="fl" for="a_pw">密碼（至少 6 個字元）</label><input type="password" id="a_pw" autocomplete="${su ? 'new-password' : 'current-password'}"></div>
+  <div id="aerr" class="neg" style="min-height:20px;font-size:13px;margin-bottom:6px"></div>
+  <button class="btn primary" style="width:100%;margin-bottom:8px" type="submit">${su ? '建立帳號' : '登入'}</button></form>
+  <button class="btn" style="width:100%;margin-bottom:12px" data-act="google">使用 Google 登入</button>
+  <div style="display:flex;justify-content:space-between;font-size:13px"><a href="#" data-act="amode" style="color:var(--accent)">${su ? '已有帳號？登入' : '沒有帳號？註冊'}</a>${su ? '' : '<a href="#" data-act="reset" style="color:var(--accent)">忘記密碼</a>'}</div>
+  <div class="row" style="margin-top:16px"><button class="btn" data-act="close">稍後再說</button></div></div>`;
+}
+function openCloud(){
+  if (!FIREBASE_CONFIG.apiKey) return;
+  if (!FB.ready) { openModal(`<div class="dlg sm"><h3>雲端服務尚未連線</h3><p>${FB.failed ? '無法載入 Firebase，請確認網路後重新整理頁面。' : '正在連線，請稍候再試。'}</p><div class="row"><button class="btn" data-act="close">關閉</button></div></div>`); return; }
+  if (!FB.user) { openModal(authHTML()); return; }
+  const st = {syncing:'同步中…', ok:'已同步', error:'同步失敗' + (FB.detail ? `（${FB.detail}）` : ''), off:'未連線'}[FB.status];
+  openModal(`<div class="dlg sm" style="max-width:440px"><h3>雲端同步</h3><p>已登入：<b>${esc(FB.user.email || '（Google 帳號）')}</b><br>狀態：${esc(st)}</p>
+  ${FB.detail === 'permission-denied' ? '<p class="neg">權限不足：請先在 Firebase 後台發布 Firestore 安全規則。</p>' : ''}
+  <div class="row"><button class="btn" data-act="close">關閉</button><button class="btn" data-act="syncnow">立即同步</button><button class="btn danger" data-act="logout">登出</button></div></div>`);
+}
+async function authSubmit(e){
+  e.preventDefault();
+  const em = $('#a_email').value.trim(), pw = $('#a_pw').value, er = m => { $('#aerr').textContent = m; }, btn = e.target.querySelector('[type=submit]');
+  if (!em || !pw) return er('請輸入 Email 與密碼');
+  btn.disabled = true;
+  try {
+    if (FB.mode === 'signup') await FB.A.createUserWithEmailAndPassword(FB.auth, em, pw); else await FB.A.signInWithEmailAndPassword(FB.auth, em, pw);
+    closeModal(); toast('登入成功，正在同步');
+  } catch (x) { er(authMsg(x)); btn.disabled = false; }
+}
 
-                return () => unsubscribe();
-            }, [user]);
-
-            // 圖示初始化與本地類別儲存
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
-            useEffect(() => { localStorage.setItem('campaign_custom_categories', JSON.stringify(customCategories)); }, [customCategories]);
-            useEffect(() => { setCategory(customCategories[type][0] || ''); }, [type, customCategories]);
-
-            const triggerStatus = (msg) => {
-                setShowStatus(msg);
-                setTimeout(() => setShowStatus(null), 3000);
-            };
-
-            const handleImageUpload = async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                triggerStatus("處理圖片中...");
-                try {
-                    const compressedBase64 = await resizeImage(file);
-                    setReceiptImage(compressedBase64);
-                    triggerStatus("圖片處理完成");
-                } catch (error) {
-                    alert("圖片處理失敗");
-                }
-            };
-
-            // 新增帳目寫入雲端
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                if (!amount || !user) return;
-
-                const newTransaction = {
-                    type,
-                    amount: parseFloat(amount),
-                    category,
-                    note,
-                    date,
-                    stage: activeStage,
-                    image: receiptImage,
-                    createdAt: new Date().toISOString(),
-                    recordedBy: user.uid // 稽核軌跡：記錄是誰新增的
-                };
-
-                try {
-                    triggerStatus("上傳雲端中...");
-                    const colRef = collection(db, getDbPath(user.uid));
-                    await addDoc(colRef, newTransaction);
-                    
-                    setAmount('');
-                    setNote('');
-                    setReceiptImage(null);
-                    if(imageInputRef.current) imageInputRef.current.value = "";
-                    triggerStatus("✔ 帳目已成功儲存至雲端");
-                } catch (err) {
-                    console.error("寫入失敗", err);
-                    alert("寫入雲端失敗，請確認您的帳號是否有權限寫入");
-                }
-            };
-
-            // 刪除雲端帳目
-            const deleteTransaction = async (dbId) => {
-                if (window.confirm("確定要從雲端永久刪除這筆記錄嗎？")) {
-                    try {
-                        await deleteDoc(doc(db, getDbPath(user.uid), dbId));
-                        triggerStatus("✔ 已刪除雲端紀錄");
-                    } catch (err) {
-                        alert("刪除失敗");
-                    }
-                }
-            };
-
-            const handleAddCategory = () => {
-                if (!newCatName.trim()) return;
-                if (customCategories[type].includes(newCatName.trim())) return alert("此類別已存在");
-                setCustomCategories({ ...customCategories, [type]: [...customCategories[type], newCatName.trim()] });
-                setNewCatName('');
-            };
-
-            const handleDeleteCategory = (catToDelete, catType) => {
-                if (window.confirm(`確定要刪除「${catToDelete}」類別嗎？`)) {
-                    setCustomCategories({ ...customCategories, [catType]: customCategories[catType].filter(c => c !== catToDelete) });
-                }
-            };
-
-            const stats = useMemo(() => {
-                const stageData = transactions.filter(t => t.stage === activeStage);
-                const income = stageData.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount, 0);
-                const expense = stageData.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + t.amount, 0);
-                return { income, expense, balance: income - expense };
-            }, [transactions, activeStage]);
-
-            const chartData = useMemo(() => {
-                const stageData = transactions.filter(t => t.stage === activeStage);
-                const incomes = {}; const expenses = {};
-                stageData.forEach(t => {
-                    if (t.type === 'INCOME') incomes[t.category] = (incomes[t.category] || 0) + t.amount;
-                    else expenses[t.category] = (expenses[t.category] || 0) + t.amount;
-                });
-                return {
-                    income: Object.keys(incomes).map(k => ({ label: k, value: incomes[k] })).sort((a,b)=>b.value-a.value),
-                    expense: Object.keys(expenses).map(k => ({ label: k, value: expenses[k] })).sort((a,b)=>b.value-a.value)
-                };
-            }, [transactions, activeStage]);
-
-            const filteredTransactions = useMemo(() => {
-                let data = transactions.filter(t => t.stage === activeStage);
-                if (searchTerm) {
-                    const lowerTerm = searchTerm.toLowerCase();
-                    data = data.filter(t => 
-                        (t.note && t.note.toLowerCase().includes(lowerTerm)) || 
-                        (t.category && t.category.toLowerCase().includes(lowerTerm)) ||
-                        (t.date && t.date.includes(lowerTerm))
-                    );
-                }
-                return data;
-            }, [transactions, activeStage, searchTerm]);
-
-            // --- 登入畫面渲染 ---
-            if (isAuthLoading && !authError) {
-                return (
-                    <div className="min-h-screen flex items-center justify-center bg-slate-50 flex-col gap-4">
-                        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                        <p className="text-slate-500 font-medium">系統安全連線中...</p>
-                    </div>
-                );
-            }
-
-            if (!user) {
-                return (
-                    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
-                        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
-                            <div className="p-8 text-center bg-slate-800 text-white">
-                                <Icon name="shield-check" size={48} className="mx-auto text-blue-400 mb-4" />
-                                <h2 className="text-2xl font-bold">清廉選戰：雲端系統</h2>
-                                <p className="text-slate-400 mt-2 text-sm">請登入以存取您的專屬加密資料庫</p>
-                            </div>
-                            <div className="p-8">
-                                {authError && (
-                                    <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-start gap-2 border border-red-100">
-                                        <Icon name="alert-circle" size={18} className="shrink-0 mt-0.5" />
-                                        <span>{authError}</span>
-                                    </div>
-                                )}
-                                <form onSubmit={handleAuth} className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">電子郵件</label>
-                                        <div className="relative">
-                                            <Icon name="mail" size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="team@example.com" />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">密碼</label>
-                                        <div className="relative">
-                                            <Icon name="lock" size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="••••••••" />
-                                        </div>
-                                    </div>
-                                    <button type="submit" disabled={isAuthLoading} className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-md transition-colors disabled:bg-blue-400 flex justify-center items-center gap-2">
-                                        {isAuthLoading ? <Icon name="loader" className="animate-spin" /> : (isRegistering ? '註冊新帳號' : '安全登入')}
-                                    </button>
-                                </form>
-                                <div className="mt-6 text-center">
-                                    <button type="button" onClick={() => { setIsRegistering(!isRegistering); setAuthError(''); }} className="text-sm text-slate-500 hover:text-blue-600 font-medium">
-                                        {isRegistering ? '已有帳號？點此登入' : '還沒有帳號？點此註冊'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
-            // --- 登入畫面結束 ---
-
-            return (
-                <div className="min-h-screen p-4 md:p-8">
-                    <div className="max-w-6xl mx-auto">
-                        
-                        {/* Header */}
-                        <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-                            <div>
-                                <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-2">
-                                    <Icon name="cloud" className="text-blue-600" />
-                                    清廉選戰：雲端協作版
-                                </h1>
-                                <p className="text-slate-500 mt-1 flex items-center gap-2 print-hidden">
-                                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                                    {dbStatus} | 登入信箱：{user?.email}
-                                </p>
-                            </div>
-                            
-                            <div className="flex flex-wrap gap-2 print-hidden">
-                                <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 text-slate-600 shadow-sm">
-                                    <Icon name="printer" size={16} /> 列印明細
-                                </button>
-                                <button onClick={handleSignOut} className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors">
-                                    <Icon name="log-out" size={16} /> 安全登出
-                                </button>
-                            </div>
-                        </header>
-
-                        {showStatus && (
-                            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg flex items-center gap-2 print-hidden">
-                                <Icon name="check-circle" size={18} /> {showStatus}
-                            </div>
-                        )}
-
-                        {/* Stage Tabs */}
-                        <div className="flex bg-white p-1 rounded-xl shadow-sm border border-slate-200 mb-8 w-fit overflow-x-auto print-hidden">
-                            {STAGES.map(s => (
-                                <button key={s} onClick={() => setActiveStage(s)} className={`px-6 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${activeStage === s ? 'bg-slate-800 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'}`}>
-                                    {s}
-                                </button>
-                            ))}
-                        </div>
-                        
-                        {/* Print only header */}
-                        <div className="hidden print:block mb-4">
-                            <h2 className="text-xl font-bold border-b pb-2">雲端報表階段：{activeStage} | 列印日期：{new Date().toLocaleDateString()}</h2>
-                        </div>
-
-                        {/* Dashboard */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 print-break-inside-avoid">
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 print-shadow-none">
-                                <div className="bg-green-100 p-3 rounded-full text-green-600"><Icon name="trending-up" /></div>
-                                <div><p className="text-sm text-slate-500">總收入 ({activeStage})</p><p className="text-2xl font-bold">${stats.income.toLocaleString()}</p></div>
-                            </div>
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 print-shadow-none">
-                                <div className="bg-red-100 p-3 rounded-full text-red-600"><Icon name="trending-down" /></div>
-                                <div><p className="text-sm text-slate-500">總支出 ({activeStage})</p><p className="text-2xl font-bold">${stats.expense.toLocaleString()}</p></div>
-                            </div>
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 print-shadow-none">
-                                <div className="bg-blue-100 p-3 rounded-full text-blue-600"><Icon name="wallet" /></div>
-                                <div><p className="text-sm text-slate-500">當前結餘</p><p className={`text-2xl font-bold ${stats.balance >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>${stats.balance.toLocaleString()}</p></div>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                            
-                            {/* 新增帳目表單 */}
-                            <div className="lg:col-span-4 print-hidden">
-                                <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-200 sticky top-4">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="text-lg font-semibold flex items-center gap-2"><Icon name="plus-circle" className="text-blue-500" /> 雲端新增帳目</h3>
-                                        <button onClick={() => setShowCategoryManager(true)} className="text-slate-400 hover:text-blue-600 transition-colors"><Icon name="settings" size={18} /></button>
-                                    </div>
-                                    <form onSubmit={handleSubmit} className="space-y-4">
-                                        <div className="flex p-1 bg-slate-100 rounded-lg">
-                                            <button type="button" onClick={() => setType('EXPENSE')} className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${type === 'EXPENSE' ? 'bg-white shadow text-red-600' : 'text-slate-500'}`}>支出</button>
-                                            <button type="button" onClick={() => setType('INCOME')} className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${type === 'INCOME' ? 'bg-white shadow text-green-600' : 'text-slate-500'}`}>收入</button>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">金額</label>
-                                            <input type="number" required value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">類別</label>
-                                            <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full px-4 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-blue-500">
-                                                {customCategories[type].map(c => <option key={c} value={c}>{c}</option>)}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">日期</label>
-                                            <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">備註/對象</label>
-                                            <textarea value={note} onChange={(e) => setNote(e.target.value)} className="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500" rows="2"></textarea>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1 flex justify-between">
-                                                <span>來源憑證/照片 <span className="text-slate-400 font-normal">(選填)</span></span>
-                                                {receiptImage && <button type="button" onClick={()=>{setReceiptImage(null); imageInputRef.current.value="";}} className="text-red-500 text-xs hover:underline">移除</button>}
-                                            </label>
-                                            {receiptImage ? (
-                                                <img src={receiptImage} alt="Receipt preview" className="w-full h-32 object-cover rounded-lg border border-slate-200 cursor-pointer" onClick={() => setPreviewImage(receiptImage)} />
-                                            ) : (
-                                                <label className="flex items-center justify-center w-full px-4 py-4 rounded-lg border-2 border-dashed border-slate-300 hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-colors">
-                                                    <div className="flex flex-col items-center gap-1 text-slate-500">
-                                                        <Icon name="camera" size={24} />
-                                                        <span className="text-sm">點擊拍照或上傳圖片</span>
-                                                    </div>
-                                                    <input type="file" accept="image/*" capture="environment" ref={imageInputRef} onChange={handleImageUpload} className="hidden" />
-                                                </label>
-                                            )}
-                                        </div>
-                                        <button type="submit" className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-lg flex items-center justify-center gap-2">同步寫入雲端</button>
-                                    </form>
-                                </div>
-                            </div>
-
-                            {/* 帳務列表 */}
-                            <div className="lg:col-span-8 print-full-width">
-                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden print-shadow-none">
-                                    <div className="p-4 md:p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                        <h3 className="text-lg font-semibold flex items-center gap-2 whitespace-nowrap"><Icon name="server" className="text-slate-500" /> 雲端帳務明細 ({activeStage})</h3>
-                                        
-                                        <div className="flex items-center gap-3 w-full md:w-auto print-hidden">
-                                            <div className="relative flex-1 md:w-64">
-                                                <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                                <input type="text" placeholder="搜尋備註、類別..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"/>
-                                            </div>
-                                            <div className="flex bg-slate-100 rounded-lg p-1 shrink-0">
-                                                <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`} title="列表檢視"><Icon name="list" size={18} /></button>
-                                                <button onClick={() => setViewMode('chart')} className={`p-1.5 rounded-md transition-all ${viewMode === 'chart' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`} title="圖表分析"><Icon name="pie-chart" size={18} /></button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {viewMode === 'chart' ? (
-                                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 print-break-inside-avoid">
-                                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                                <PieChart data={chartData.expense} title="支出分佈分析" />
-                                            </div>
-                                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                                <PieChart data={chartData.income} title="收入來源分析" />
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-left">
-                                                <thead className="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200">
-                                                    <tr>
-                                                        <th className="px-6 py-3">日期</th>
-                                                        <th className="px-6 py-3">類別</th>
-                                                        <th className="px-6 py-3">說明</th>
-                                                        <th className="px-6 py-3 text-center print-hidden">憑證</th>
-                                                        <th className="px-6 py-3 text-right">金額</th>
-                                                        <th className="px-6 py-3 text-center print-hidden">操作</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-100">
-                                                    {filteredTransactions.length === 0 ? (
-                                                        <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-400">{searchTerm ? '無符合條件資料' : '雲端尚無資料，請新增您的第一筆帳目。'}</td></tr>
-                                                    ) : (
-                                                        filteredTransactions.map((t) => (
-                                                            <tr key={t.dbId} className="hover:bg-slate-50 transition-colors">
-                                                                <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">{t.date}</td>
-                                                                <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 py-1 rounded-md text-xs font-medium ${t.type === 'INCOME' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{t.category}</span></td>
-                                                                <td className="px-6 py-4 text-sm text-slate-600 max-w-[200px] truncate" title={t.note}>{t.note || '-'}</td>
-                                                                <td className="px-6 py-4 text-center print-hidden">
-                                                                    {t.image ? (
-                                                                        <button onClick={() => setPreviewImage(t.image)} className="text-blue-500 hover:text-blue-700" title="查看圖片"><Icon name="image" size={18} className="mx-auto" /></button>
-                                                                    ) : <span className="text-slate-300">-</span>}
-                                                                </td>
-                                                                <td className={`px-6 py-4 text-sm font-bold text-right whitespace-nowrap ${t.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>{t.type === 'INCOME' ? '+' : '-'}{t.amount.toLocaleString()}</td>
-                                                                <td className="px-6 py-4 text-center print-hidden"><button onClick={() => deleteTransaction(t.dbId)} className="text-slate-300 hover:text-red-500 transition-colors" title="刪除雲端紀錄"><Icon name="trash-2" size={18} className="mx-auto" /></button></td>
-                                                            </tr>
-                                                        ))
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Category Manager Modal */}
-                        {showCategoryManager && (
-                            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 print-hidden">
-                                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-                                    <div className="p-4 border-b flex justify-between items-center">
-                                        <h3 className="font-bold flex items-center gap-2"><Icon name="settings" size={18} /> 管理 {type === 'INCOME' ? '收入' : '支出'} 類別</h3>
-                                        <button onClick={() => setShowCategoryManager(false)} className="text-slate-400 hover:text-slate-600"><Icon name="x" /></button>
-                                    </div>
-                                    <div className="p-6">
-                                        <div className="flex gap-2 mb-6">
-                                            <input type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} className="flex-1 px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="新類別名稱..." onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()} />
-                                            <button onClick={handleAddCategory} className="bg-blue-600 hover:bg-blue-700 transition-colors text-white p-2 rounded-lg"><Icon name="plus" /></button>
-                                        </div>
-                                        <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                                            {customCategories[type].map(cat => (
-                                                <div key={cat} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                                    <span className="text-sm font-medium">{cat}</span>
-                                                    <button onClick={() => handleDeleteCategory(cat, type)} className="text-slate-400 hover:text-red-500 transition-colors"><Icon name="trash-2" size={16} /></button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="p-4 bg-slate-50 border-t rounded-b-2xl text-center"><button onClick={() => setShowCategoryManager(false)} className="text-sm font-medium text-blue-600 hover:underline">完成並關閉</button></div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Image Preview Modal */}
-                        {previewImage && (
-                            <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 print-hidden" onClick={() => setPreviewImage(null)}>
-                                <div className="relative max-w-4xl w-full max-h-screen flex flex-col items-center justify-center" onClick={e => e.stopPropagation()}>
-                                    <button onClick={() => setPreviewImage(null)} className="absolute -top-10 right-0 text-white hover:text-slate-300 transition-colors"><Icon name="x" size={32} /></button>
-                                    <img src={previewImage} alt="Receipt Full" className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            );
-        }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
+/* ============ boot ============ */
+(async function boot(){
+  S.settings = mergeSettings({});
+  try {
+    await IDB.open();
+    const saved = await IDB.getKV('settings'); if (saved) S.settings = mergeSettings(saved);
+    S.trades = (await IDB.all()).map(norm).filter(Boolean);
+    const sg = await IDB.getKV('grids'); if (Array.isArray(sg)) S.grids = sg.map(normGrid).filter(Boolean);
+  } catch (e) { toast('無法使用本機儲存，資料將不會保留'); warned = true; }
+  applyTheme(); buildNav(); recompute(); render(); chromeCloud(); fbInit();
+})();
+})();
+</script>
 </body>
 </html>
