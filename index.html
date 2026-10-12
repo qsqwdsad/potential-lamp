@@ -148,6 +148,7 @@ td small{display:block;color:var(--muted);font-size:12px}
 .kv{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
 .kv div{background:var(--panel2);border-radius:10px;padding:10px 12px}.kv span{font-size:12px;color:var(--muted);display:block}.kv b{font-size:15px}
 .crow{display:grid;grid-template-columns:1.2fr .9fr 1.5fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px}
+.trow{display:grid;grid-template-columns:1fr 1fr .8fr auto;gap:8px;align-items:end;margin-bottom:8px}
 .note{white-space:pre-wrap;background:var(--panel2);border-radius:10px;padding:12px;margin-top:6px;font-size:13.5px}
 #toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);z-index:99;display:grid;gap:8px}
 #toast div{background:var(--text);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;box-shadow:var(--shadow);font-size:13.5px}
@@ -168,6 +169,7 @@ footer{margin-top:30px;color:var(--muted);font-size:12px;text-align:center}
   .toolbar input[type=text]{width:100%}
   .pv{position:static}
   .crow{grid-template-columns:1fr 1fr}.crow .btn{grid-column:span 2}
+  .trow{grid-template-columns:1fr 1fr}.trow .btn{grid-column:span 2}
   .overlay{padding:0}.dlg{border-radius:0;min-height:100%}
 }
 @media print{.side,.bottom,.top-r,.btn,#toast{display:none!important}.app{display:block}.card,.tw{box-shadow:none}}
@@ -289,6 +291,7 @@ const saveSettings = () => persist(() => IDB.setKV('settings', S.settings));
 const saveGrids = () => persist(() => IDB.setKV('grids', S.grids));
 
 /* ============ normalize ============ */
+function deriveTp(t){ const tot = sum(t.tps.map(x => x.pct)); t.tp = tot > 0 ? sum(t.tps.map(x => x.price * x.pct)) / tot : null; }
 function deriveClose(t){
   const cl = t.closes.slice().sort((a, b) => a.at < b.at ? -1 : a.at > b.at ? 1 : 0), tot = sum(cl.map(c => c.pct));
   t.closes = cl; t.feeClose = sum(cl.map(c => c.fee)); t.fees = t.feeOpen + t.feeClose + t.funding;
@@ -302,7 +305,7 @@ function norm(o){
   const t = {
     id:str(o.id || uid(), 40), coin:str(o.coin, 20).toUpperCase().trim(), dir:o.dir === 'Short' ? 'Short' : 'Long',
     lev:Math.max(1, Math.round(n(o.lev) || 1)), notional:n(o.notional), entry:n(o.entry), exit:n(o.exit), sl:n(o.sl), tp:n(o.tp),
-    mode:['isolated', 'split'].includes(o.mode) ? o.mode : 'cross', mbal:(n(o.mbal) > 0 ? n(o.mbal) : null), liqPx:(n(o.liqPx) > 0 ? n(o.liqPx) : null), fees:0, feeOpen:0, feeClose:0, funding:0, closes:[], openAt:str(o.openAt, 16), closeAt:null, exchange:str(o.exchange, 60), strategy:str(o.strategy, 60), tf:str(o.tf, 10),
+    mode:['isolated', 'split'].includes(o.mode) ? o.mode : 'cross', mbal:(n(o.mbal) > 0 ? n(o.mbal) : null), liqPx:(n(o.liqPx) > 0 ? n(o.liqPx) : null), fees:0, feeOpen:0, feeClose:0, funding:0, closes:[], tps:[], openAt:str(o.openAt, 16), closeAt:null, exchange:str(o.exchange, 60), strategy:str(o.strategy, 60), tf:str(o.tf, 10),
     emotion:str(o.emotion, 20), rating:Math.min(5, Math.max(0, Math.round(n(o.rating) || 0))),
     checks:Array.isArray(o.checks) ? o.checks.map(x => str(x, 40)) : [], mistakes:Array.isArray(o.mistakes) ? o.mistakes.map(x => str(x, 60)) : [],
     notes:str(o.notes), review:str(o.review), shot:(typeof o.shot === 'string' && o.shot.startsWith('data:image/') && o.shot.length <= 700000) ? o.shot : null, demo:!!o.demo, updatedAt:Math.max(0, n(o.updatedAt) || 0)
@@ -312,6 +315,9 @@ function norm(o){
   const cs = Array.isArray(o.closes) ? o.closes : (n(o.exit) != null ? [{price:o.exit, pct:100, at:o.closeAt || o.openAt, fee:split ? (n(o.feeClose) || 0) : 0}] : []);
   t.closes = cs.slice(0, 20).map(c => ({price:n(c && c.price), pct:n(c && c.pct), at:re.test(String(c && c.at)) ? c.at : t.openAt, fee:n(c && c.fee) || 0})).filter(c => c.price > 0 && c.pct > 0 && c.pct <= 100);
   deriveClose(t);
+  const ts = Array.isArray(o.tps) ? o.tps : (n(o.tp) != null ? [{price:o.tp, pct:100}] : []);
+  t.tps = ts.slice(0, 10).map(x => ({price:n(x && x.price), pct:n(x && x.pct)})).filter(x => x.price > 0 && x.pct > 0 && x.pct <= 100);
+  deriveTp(t);
   if (!t.coin || !(t.entry > 0) || !(t.notional > 0) || !re.test(t.openAt)) return null;
   return t;
 }
@@ -779,7 +785,7 @@ async function submitGrid(e){
 /* ============ trade form ============ */
 function field(label, id, val, type = 'number', extra = ''){ return `<div class="field"><label class="fl" for="${id}">${label}</label><input type="${type}" id="${id}" value="${esc(val ?? '')}" ${extra}></div>`; }
 function openForm(id, preset){
-  const t = id ? S.trades.find(x => x.id === id) : (preset || {dir:'Long', lev:10, openAt:nowLocal(), checks:[], mistakes:[], rating:0, emotion:'冷靜', fees:0, mode:'cross', closes:[], exchange:(S.settings.exchanges[0] || '')});
+  const t = id ? S.trades.find(x => x.id === id) : (preset || {dir:'Long', lev:10, openAt:nowLocal(), checks:[], mistakes:[], rating:0, emotion:'冷靜', fees:0, mode:'cross', closes:[], tps:[], exchange:(S.settings.exchanges[0] || '')});
   const s = S.settings; FORM = {shot:t.shot || null, editId:id || null};
   const dl = (name, arr) => `<datalist id="${name}">${[...new Set(arr)].map(x => `<option value="${esc(x)}">`).join('')}</datalist>`;
   openModal(`<div class="dlg"><div class="dh"><h2>${id ? '編輯交易' : '新增交易'}</h2><button class="btn sm" data-act="close">關閉</button></div>
@@ -793,9 +799,10 @@ function openForm(id, preset){
       <div class="row3">${field('平台', 'f_ex', t.exchange, 'text', 'list="dl_ex" maxlength="60"')}${field('策略', 'f_str', t.strategy, 'text', 'list="dl_str" maxlength="60"')}
       <div class="field"><label class="fl" for="f_tf">交易週期</label><select id="f_tf" style="width:100%"><option value="">未填</option>${TFS.map(x => `<option ${t.tf === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div></div></div>
     <div class="fs"><h4>價格與時間</h4>
-      <div class="row3">${field('開倉價', 'f_entry', t.entry, 'number', 'min="0" step="any"')}${field('止損價', 'f_sl', t.sl, 'number', 'min="0" step="any"')}${field('止盈價', 'f_tp', t.tp, 'number', 'min="0" step="any"')}</div>
+      <div class="row2">${field('開倉價', 'f_entry', t.entry, 'number', 'min="0" step="any"')}${field('止損價', 'f_sl', t.sl, 'number', 'min="0" step="any"')}</div>
       <div class="row3">${field('開倉時間', 'f_open', t.openAt, 'datetime-local')}</div></div>
-    <div class="fs"><h4>平倉紀錄 <span class="muted" style="font-weight:400">· 可分批平倉，累計 100% 才算已平倉</span> <button type="button" class="btn sm" data-act="addclose" style="float:right">＋ 新增平倉</button></h4><div id="closes"></div><div id="clsum" class="muted" style="font-size:12.5px"></div></div>
+    <div class="fs"><h4>止盈計畫 (TP) <span class="muted" style="font-weight:400">· 可設多個，比例＝到該價要平掉的倉位 %</span> <span style="float:right;white-space:nowrap"><button type="button" class="btn sm" data-act="tpeven">均分比例</button> <button type="button" class="btn sm" data-act="addtp">＋ 新增 TP</button></span></h4><div id="tps"></div><div id="tpsum" class="muted" style="font-size:12.5px"></div></div>
+    <div class="fs"><h4>平倉紀錄 <span class="muted" style="font-weight:400">· 可分批平倉，累計 100% 才算已平倉</span> <span style="float:right;white-space:nowrap"><button type="button" class="btn sm" data-act="tp2close">依 TP 帶入</button> <button type="button" class="btn sm" data-act="addclose">＋ 新增平倉</button></span></h4><div id="closes"></div><div id="clsum" class="muted" style="font-size:12.5px"></div></div>
     <div class="fs"><h4>費用 <span class="muted" style="font-weight:400">· 開倉手續費與資金費；平倉手續費記在各筆平倉紀錄</span> <button type="button" class="btn sm" data-act="feeest" style="float:right">依費率估算</button></h4>
       <div class="row2">${field('開倉手續費 (USDT)', 'f_feeo', t.feeOpen ?? 0, 'number', 'min="0" step="any"')}${field('資金費 (USDT)', 'f_fund', t.funding ?? 0, 'number', 'step="any"')}</div>
       <p class="muted" style="font-size:12px">資金費：付出填正數，收到填負數。費率可在「設定」填入，供「依費率估算」使用。</p></div>
@@ -811,8 +818,19 @@ function openForm(id, preset){
   </div><div><div class="pv" id="pv"></div></div></div></div>
   <div class="df"><span id="ferr" class="neg" style="margin-right:auto;align-self:center"></span><button type="button" class="btn" data-act="close">取消</button><button type="submit" class="btn primary">${id ? '儲存變更' : '記錄交易'}</button></div></form>
   ${dl('dl_coin', [...COINS, ...S.trades.map(x => x.coin)])}${dl('dl_ex', [...s.exchanges, ...S.trades.map(x => x.exchange).filter(Boolean)])}${dl('dl_str', [...s.strategies, ...S.trades.map(x => x.strategy).filter(Boolean)])}<datalist id="dl_pct"><option value="25"><option value="50"><option value="75"><option value="100"></datalist></div>`);
-  (t.closes || []).forEach(addCloseRow);
+  (t.closes || []).forEach(c => addCloseRow(c));
+  (t.tps && t.tps.length ? t.tps : [{}]).forEach(x => addTpRow(x));
   updatePV();
+}
+function addTpRow(c){
+  c = c || {};
+  const cur = $$('#tps .trow').reduce((a, r) => a + (num(r.querySelector('.tp_pct').value) || 0), 0);
+  const el = document.createElement('div'); el.className = 'trow';
+  el.innerHTML = `<div><label class="fl">TP 價</label><input type="number" class="tp_price" step="any" min="0" value="${c.price ?? ''}"></div>
+  <div><label class="fl">平倉比例 %</label><input type="number" class="tp_pct" step="any" min="0" max="100" list="dl_pct" value="${c.pct ?? Math.max(0, +(100 - cur).toFixed(2))}"></div>
+  <div><label class="fl">預期盈虧比</label><div class="tp_rr" style="padding:8px 0;font-weight:600">—</div></div>
+  <button type="button" class="btn sm danger" data-act="rmtp" title="移除">✕</button>`;
+  $('#tps').appendChild(el);
 }
 function addCloseRow(c){
   c = c || {};
@@ -829,18 +847,22 @@ function readForm(){
   const g = id => $('#' + id).value;
   const rows = $$('#closes .crow').map(r => ({price:num(r.querySelector('.cl_price').value), pct:num(r.querySelector('.cl_pct').value), at:r.querySelector('.cl_at').value, fee:num(r.querySelector('.cl_fee').value) || 0}));
   const ok = rows.filter(c => c.price > 0 && c.pct > 0 && c.pct <= 100 && c.at);
+  const tpRows = $$('#tps .trow').map(r => ({price:num(r.querySelector('.tp_price').value), pct:num(r.querySelector('.tp_pct').value)}));
+  const fTp = tpRows.filter(x => x.price != null), okTp = fTp.filter(x => x.price > 0 && x.pct > 0 && x.pct <= 100);
   const t = {id:FORM.editId || uid(), coin:g('f_coin').trim().toUpperCase(), dir:$('input[name=f_dir]:checked').value, lev:Math.round(num(g('f_lev')) || 0), notional:num(g('f_notional')),
-    mode:g('f_mode'), mbal:num(g('f_mbal')), liqPx:num(g('f_liq')), entry:num(g('f_entry')), exit:null, sl:num(g('f_sl')), tp:num(g('f_tp')),
+    mode:g('f_mode'), mbal:num(g('f_mbal')), liqPx:num(g('f_liq')), entry:num(g('f_entry')), exit:null, sl:num(g('f_sl')), tp:null, tps:okTp, _badTp:fTp.length - okTp.length,
     feeOpen:num(g('f_feeo')) || 0, funding:num(g('f_fund')) || 0, openAt:g('f_open'), closeAt:null, closes:ok, _bad:rows.length - ok.length,
     exchange:g('f_ex').trim(), strategy:g('f_str').trim(), tf:g('f_tf'), emotion:g('f_emo'), rating:+g('f_rate'), checks:$$('.f_chk:checked').map(x => x.value), mistakes:$$('.f_mis:checked').map(x => x.value),
     notes:g('f_notes').trim(), review:g('f_rev').trim(), shot:FORM.shot};
-  deriveClose(t); return t;
+  deriveClose(t); deriveTp(t); return t;
 }
 const tp100 = t => sum(t.closes.map(x => x.pct)) > 100.0001;
 function updatePV(){
   const pv = $('#pv'); if (!pv) return;
   const t = readForm(), ok = t.entry > 0 && t.notional > 0 && t.lev > 0;
   const cs = $('#clsum'); if (cs) { const tp = sum(t.closes.map(x => x.pct)); cs.textContent = t.closes.length ? `累計已平倉 ${fmt(tp, 1)}%，剩餘 ${fmt(Math.max(0, 100 - tp), 1)}%${tp > 100.0001 ? '（超過 100%）' : ''}` : '尚未平倉（持倉中）'; cs.className = tp100(t) ? 'neg' : 'muted'; }
+  $$('#tps .trow').forEach(row => { const pr = num(row.querySelector('.tp_price').value), el = row.querySelector('.tp_rr'); el.textContent = (pr > 0 && t.sl != null && t.entry > 0 && t.sl !== t.entry) ? fmt(Math.abs(pr - t.entry) / Math.abs(t.entry - t.sl), 2) + 'R' : '—'; });
+  const tsm = $('#tpsum'); if (tsm) { const tpp = sum(t.tps.map(x => x.pct)); tsm.textContent = t.tps.length ? `TP 合計 ${fmt(tpp, 1)}% · 加權平均 TP ${price(t.tp)}` : '尚未設定 TP'; tsm.className = tpp > 100.0001 ? 'neg' : 'muted'; }
   if (!ok) { pv.innerHTML = '<h4>即時試算</h4><p class="muted">輸入開倉價、倉位價值與槓桿後，這裡會即時計算風險與盈虧。</p>'; return; }
   const c = calc(t), eq = Math.max(S.equity, 1), v = violList(t, c, eq), warns = [];
   if (c.slWrong) warns.push(['bad', `止損價位置不合理（${t.dir === 'Long' ? '多單止損應低於開倉價' : '空單止損應高於開倉價'}）`]);
@@ -865,6 +887,9 @@ async function submitForm(e){
   if (!(t.notional > 0)) return err('請輸入倉位價值');
   if (!(t.entry > 0)) return err('請輸入開倉價');
   if (!t.openAt) return err('請選擇開倉時間');
+  if (t._badTp) return err('TP 有欄位未填完整：需要 TP 價與平倉比例（0–100%）');
+  if (sum(t.tps.map(x => x.pct)) > 100.0001) return err('TP 的比例合計不能超過 100%');
+  if (t.tps.some(x => t.dir === 'Long' ? x.price <= t.entry : x.price >= t.entry)) return err('TP 價位置不合理：多單要高於開倉價，空單要低於開倉價');
   if (t._bad) return err('平倉紀錄有欄位未填完整：需要平倉價、比例（0–100%）與時間');
   if (tp100(t)) return err('累計平倉比例不能超過 100%');
   if (t.closes.some(c => c.at < t.openAt)) return err('平倉時間不能早於開倉時間');
@@ -896,6 +921,7 @@ function openDetail(id){
     <div><span>平台 / 策略</span><b>${esc(t.exchange) || '—'} / ${esc(t.strategy) || '—'}</b></div><div><span>週期 / 情緒 / 評分</span><b>${esc(t.tf) || '—'} / ${esc(t.emotion) || '—'} / ${t.rating ? '★'.repeat(t.rating) : '—'}</b></div>
     <div><span>開倉時間</span><b>${fmtDT(t.openAt)}</b></div><div><span>平倉時間</span><b>${fmtDT(t.closeAt)}</b></div></div>
   ${t.exit != null ? `<div class="alert ${d.compliant ? 'info' : 'bad'}"><div><b>${d.compliant ? '這筆交易符合紀律' : '這筆交易有違規'}</b>${[...t.mistakes, ...d.viol.map(v => v.msg)].length ? '：' + esc([...t.mistakes, ...d.viol.map(v => v.msg)].join('、')) : ''}</div></div>` : ''}
+  ${t.tps.length ? `<div class="fs"><h4>止盈計畫</h4>${t.tps.map((x, i) => `<div class="list-item" style="cursor:default"><span>TP${i + 1} · ${price(x.price)}</span><span>${fmt(x.pct, 1)}% 平倉${t.sl != null && t.sl !== t.entry ? ' · ' + fmt(Math.abs(x.price - t.entry) / Math.abs(t.entry - t.sl), 2) + 'R' : ''}</span></div>`).join('')}</div>` : ''}
   ${t.closes.length ? `<div class="fs"><h4>平倉紀錄</h4>${t.closes.map(c => `<div class="list-item" style="cursor:default"><span>${fmtDT(c.at)} · ${price(c.price)}</span><span>${fmt(c.pct, 1)}% · 手續費 ${usd(c.fee)}</span></div>`).join('')}</div>` : ''}
   <div class="fs"><h4>進場前檢查清單 ${d.chk != null ? `<span class="muted" style="font-weight:400">· 完成 ${pct(d.chk, 0)}</span>` : ''}</h4>${items.map(i => `<div class="chk" style="cursor:default"><span class="${t.checks.includes(i.id) ? 'pos' : 'neg'}">${t.checks.includes(i.id) ? '✓' : '✗'}</span><span>${esc(i.text)}</span></div>`).join('') || '<span class="muted">未設定清單</span>'}</div>
   ${t.notes ? `<div class="fs"><h4>進場理由與計畫</h4><div class="note">${esc(t.notes)}</div></div>` : ''}${t.review ? `<div class="fs"><h4>復盤心得</h4><div class="note">${esc(t.review)}</div></div>` : ''}
@@ -905,12 +931,12 @@ function openDetail(id){
 
 /* ============ data actions ============ */
 function csvExport(){
-  const head = ['狀態','幣種','方向','槓桿','倉位價值','數量','開倉價','平倉價','止損','止盈','開倉手續費','平倉手續費','資金費','費用合計','毛盈虧','淨盈虧','保證金報酬率','R倍數','開倉時間','平倉時間','平台','策略','週期','情緒','評分','錯誤標籤','違規','清單完成率','進場計畫','復盤','保證金模式','強平價','平倉明細'];
+  const head = ['狀態','幣種','方向','槓桿','倉位價值','數量','開倉價','平倉價','止損','止盈','開倉手續費','平倉手續費','資金費','費用合計','毛盈虧','淨盈虧','保證金報酬率','R倍數','開倉時間','平倉時間','平台','策略','週期','情緒','評分','錯誤標籤','違規','清單完成率','進場計畫','復盤','保證金模式','強平價','平倉明細','TP計畫'];
   const q = v => { const s = String(v ?? ''); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const tx = v => { const s = String(v ?? ''); return /^[=+\-@\t\r]/.test(s) ? "'" + s : s; };
   const r = (n, d = 4) => n == null ? '' : +n.toFixed(d);
   const rows = [...S.trades].sort((a, b) => a.openAt < b.openAt ? -1 : 1).map(t => { const d = S.D[t.id];
-    return [t.exit == null ? '持倉中' : '已平倉', tx(t.coin), t.dir, t.lev, t.notional, r(d.size, 6), t.entry, t.exit ?? '', t.sl ?? '', t.tp ?? '', t.feeOpen, t.feeClose, t.funding, t.fees, r(d.gross, 4), r(d.net, 4), r(d.roi, 4), r(d.R, 3), t.openAt, t.closeAt ?? '', tx(t.exchange), tx(t.strategy), t.tf, t.emotion, t.rating || '', tx(t.mistakes.join('|')), tx(d.viol.map(v => v.msg).join('|')), d.chk != null ? r(d.chk, 2) : '', tx(t.notes), tx(t.review), MODES[t.mode] || '全倉', r(d.liq, 6), tx(t.closes.map(c => c.price + 'x' + c.pct + '%').join('|'))].map(q).join(','); });
+    return [t.exit == null ? '持倉中' : '已平倉', tx(t.coin), t.dir, t.lev, t.notional, r(d.size, 6), t.entry, t.exit ?? '', t.sl ?? '', t.tp ?? '', t.feeOpen, t.feeClose, t.funding, t.fees, r(d.gross, 4), r(d.net, 4), r(d.roi, 4), r(d.R, 3), t.openAt, t.closeAt ?? '', tx(t.exchange), tx(t.strategy), t.tf, t.emotion, t.rating || '', tx(t.mistakes.join('|')), tx(d.viol.map(v => v.msg).join('|')), d.chk != null ? r(d.chk, 2) : '', tx(t.notes), tx(t.review), MODES[t.mode] || '全倉', r(d.liq, 6), tx(t.closes.map(c => c.price + 'x' + c.pct + '%').join('|')), tx(t.tps.map(x => x.price + 'x' + x.pct + '%').join('|'))].map(q).join(','); });
   download('\ufeff' + head.join(',') + '\r\n' + rows.join('\r\n'), `trades-${today()}.csv`, 'text/csv;charset=utf-8');
   toast('已匯出 CSV');
 }
@@ -983,6 +1009,10 @@ const ACT = {
   calnext:() => { S.cal = new Date(S.cal.getFullYear(), S.cal.getMonth() + 1, 1); render(); },
   caltoday:() => { S.cal = new Date(); render(); },
   addclose:() => { addCloseRow(); updatePV(); },
+  addtp:() => { addTpRow(); updatePV(); },
+  rmtp:(el) => { el.closest('.trow').remove(); updatePV(); },
+  tpeven:() => { const rows = $$('#tps .trow'), n = rows.length; if (!n) return; const each = Math.floor(10000 / n) / 100; let used = 0; rows.forEach((row, i) => { const v = i === n - 1 ? +(100 - used).toFixed(2) : each; used += v; row.querySelector('.tp_pct').value = v; }); updatePV(); },
+  tp2close:() => { const t = readForm(); if (!t.tps.length) { toast('請先設定 TP 計畫'); return; } t.tps.forEach(x => addCloseRow({price:x.price, pct:x.pct, fee:0})); updatePV(); toast('已帶入 TP 計畫，請改成實際成交價與時間'); },
   rmclose:(el) => { el.closest('.crow').remove(); updatePV(); },
   feeest:() => {
     const r = S.settings.feeRate || {open:0, close:0};
