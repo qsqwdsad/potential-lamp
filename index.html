@@ -147,6 +147,7 @@ td small{display:block;color:var(--muted);font-size:12px}
 .shot{max-width:100%;max-height:220px;border-radius:10px;border:1px solid var(--line);cursor:zoom-in;display:block;margin-top:8px}
 .kv{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
 .kv div{background:var(--panel2);border-radius:10px;padding:10px 12px}.kv span{font-size:12px;color:var(--muted);display:block}.kv b{font-size:15px}
+.crow{display:grid;grid-template-columns:1.2fr .9fr 1.5fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px}
 .note{white-space:pre-wrap;background:var(--panel2);border-radius:10px;padding:12px;margin-top:6px;font-size:13.5px}
 #toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);z-index:99;display:grid;gap:8px}
 #toast div{background:var(--text);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;box-shadow:var(--shadow);font-size:13.5px}
@@ -166,6 +167,7 @@ footer{margin-top:30px;color:var(--muted);font-size:12px;text-align:center}
   .cell{min-height:58px;padding:4px}.cell b{font-size:11px}
   .toolbar input[type=text]{width:100%}
   .pv{position:static}
+  .crow{grid-template-columns:1fr 1fr}.crow .btn{grid-column:span 2}
   .overlay{padding:0}.dlg{border-radius:0;min-height:100%}
 }
 @media print{.side,.bottom,.top-r,.btn,#toast{display:none!important}.app{display:block}.card,.tw{box-shadow:none}}
@@ -240,7 +242,7 @@ const SUB = {dashboard:'帳戶表現與今日風控一覽', trades:'所有開倉
 const DEFAULTS = {
   brand:'TradeLedger Pro', trader:'', capital:1000, theme:'auto',
   rules:{maxRiskPct:2, maxDailyLoss:50, maxTradesPerDay:5, maxLeverage:20, requireSL:true},
-  feeRate:{open:0, close:0},
+  feeRate:{open:0, close:0}, mmr:0.5,
   checklist:[
     {id:'c1',text:'符合策略的進場條件'},{id:'c2',text:'已設定止損'},{id:'c3',text:'單筆風險在規則內'},
     {id:'c4',text:'預期盈虧比 ≥ 1.5'},{id:'c5',text:'已確認大週期方向'},{id:'c6',text:'情緒平穩，非追單或報復'}],
@@ -287,6 +289,11 @@ const saveSettings = () => persist(() => IDB.setKV('settings', S.settings));
 const saveGrids = () => persist(() => IDB.setKV('grids', S.grids));
 
 /* ============ normalize ============ */
+function deriveClose(t){
+  const cl = t.closes.slice().sort((a, b) => a.at < b.at ? -1 : a.at > b.at ? 1 : 0), tot = sum(cl.map(c => c.pct));
+  t.closes = cl; t.feeClose = sum(cl.map(c => c.fee)); t.fees = t.feeOpen + t.feeClose + t.funding;
+  if (tot >= 99.999) { t.exit = sum(cl.map(c => c.price * c.pct)) / tot; t.closeAt = cl[cl.length - 1].at; } else { t.exit = null; t.closeAt = null; }
+}
 function norm(o){
   if (!o || typeof o !== 'object') return null;
   const n = v => { const x = parseFloat(v); return Number.isFinite(x) ? x : null; };
@@ -295,21 +302,22 @@ function norm(o){
   const t = {
     id:str(o.id || uid(), 40), coin:str(o.coin, 20).toUpperCase().trim(), dir:o.dir === 'Short' ? 'Short' : 'Long',
     lev:Math.max(1, Math.round(n(o.lev) || 1)), notional:n(o.notional), entry:n(o.entry), exit:n(o.exit), sl:n(o.sl), tp:n(o.tp),
-    fees:0, feeOpen:0, feeClose:0, funding:0, openAt:str(o.openAt, 16), closeAt:null, exchange:str(o.exchange, 60), strategy:str(o.strategy, 60), tf:str(o.tf, 10),
+    mode:['isolated', 'split'].includes(o.mode) ? o.mode : 'cross', mbal:(n(o.mbal) > 0 ? n(o.mbal) : null), liqPx:(n(o.liqPx) > 0 ? n(o.liqPx) : null), fees:0, feeOpen:0, feeClose:0, funding:0, closes:[], openAt:str(o.openAt, 16), closeAt:null, exchange:str(o.exchange, 60), strategy:str(o.strategy, 60), tf:str(o.tf, 10),
     emotion:str(o.emotion, 20), rating:Math.min(5, Math.max(0, Math.round(n(o.rating) || 0))),
     checks:Array.isArray(o.checks) ? o.checks.map(x => str(x, 40)) : [], mistakes:Array.isArray(o.mistakes) ? o.mistakes.map(x => str(x, 60)) : [],
     notes:str(o.notes), review:str(o.review), shot:(typeof o.shot === 'string' && o.shot.startsWith('data:image/') && o.shot.length <= 700000) ? o.shot : null, demo:!!o.demo, updatedAt:Math.max(0, n(o.updatedAt) || 0)
   };
   const split = o.feeOpen != null || o.feeClose != null || o.funding != null;
-  if (split) { t.feeOpen = n(o.feeOpen) || 0; t.feeClose = n(o.feeClose) || 0; t.funding = n(o.funding) || 0; t.fees = t.feeOpen + t.feeClose + t.funding; }
-  else { t.feeOpen = n(o.fees) || 0; t.fees = t.feeOpen; }
+  t.feeOpen = split ? (n(o.feeOpen) || 0) : (n(o.fees) || 0); t.funding = split ? (n(o.funding) || 0) : 0;
+  const cs = Array.isArray(o.closes) ? o.closes : (n(o.exit) != null ? [{price:o.exit, pct:100, at:o.closeAt || o.openAt, fee:split ? (n(o.feeClose) || 0) : 0}] : []);
+  t.closes = cs.slice(0, 20).map(c => ({price:n(c && c.price), pct:n(c && c.pct), at:re.test(String(c && c.at)) ? c.at : t.openAt, fee:n(c && c.fee) || 0})).filter(c => c.price > 0 && c.pct > 0 && c.pct <= 100);
+  deriveClose(t);
   if (!t.coin || !(t.entry > 0) || !(t.notional > 0) || !re.test(t.openAt)) return null;
-  if (t.exit != null) t.closeAt = re.test(String(o.closeAt)) ? o.closeAt : t.openAt;
   return t;
 }
 
 /* ============ calculations ============ */
-function calc(t){
+function calc(t, eqIn){
   const size = t.entry > 0 ? t.notional / t.entry : 0;
   const margin = t.lev > 0 ? t.notional / t.lev : 0;
   const closed = t.exit != null, d = t.dir === 'Long' ? 1 : -1;
@@ -319,11 +327,16 @@ function calc(t){
   const R = closed && risk > 0 ? net / risk : null;
   const rr = (t.sl != null && t.tp != null && t.sl !== t.entry) ? Math.abs(t.tp - t.entry) / Math.abs(t.entry - t.sl) : null;
   const roi = closed && margin > 0 ? net / margin : null;
-  const liq = t.lev > 0 ? (d === 1 ? t.entry * (1 - 1 / t.lev + 0.005) : t.entry * (1 + 1 / t.lev - 0.005)) : null;
+  const mm = (S.settings && S.settings.mmr != null ? S.settings.mmr : 0.5) / 100;
+  const W = t.mbal > 0 ? t.mbal : (t.mode === 'isolated' || t.mode === 'split' ? margin : Math.max(eqIn != null ? eqIn : S.equity, 0));
+  let liqEst = size > 0 ? (d === 1 ? (t.entry - W / size) / (1 - mm) : (t.entry + W / size) / (1 + mm)) : null;
+  if (liqEst != null && liqEst <= 0) liqEst = null;
+  const liq = t.liqPx > 0 ? t.liqPx : liqEst, liqDist = liq != null ? Math.abs(t.entry - liq) / t.entry : null;
+  const cls = t.closes || [], closedPct = sum(cls.map(c => c.pct)), partial = sum(cls.map(c => (c.price - t.entry) * d * size * c.pct / 100 - (c.fee || 0)));
   const slWrong = t.sl != null && (d === 1 ? t.sl >= t.entry : t.sl <= t.entry);
   const tpWrong = t.tp != null && (d === 1 ? t.tp <= t.entry : t.tp >= t.entry);
   const hold = closed && t.closeAt ? new Date(t.closeAt) - new Date(t.openAt) : null;
-  return {size, margin, gross, net, risk, R, rr, roi, liq, slWrong, tpWrong, hold};
+  return {size, margin, gross, net, risk, R, rr, roi, liq, liqDist, closedPct, partial, slWrong, tpWrong, hold};
 }
 function violList(t, c, eq){
   const r = S.settings.rules, v = [];
@@ -337,14 +350,14 @@ function recompute(){
   const cap = S.settings.capital;
   const cl = S.trades.filter(t => t.exit != null && t.closeAt).sort((a, b) => a.closeAt < b.closeAt ? -1 : a.closeAt > b.closeAt ? 1 : 0);
   const pre = [0]; cl.forEach(t => pre.push(pre[pre.length - 1] + calc(t).net));
-  S.equity = cap + pre[pre.length - 1];
+  S.equity = cap + pre[pre.length - 1] + sum(S.trades.filter(t => t.exit == null).map(t => calc(t).partial));
   S.D = {};
   const items = S.settings.checklist;
   S.trades.forEach(t => {
-    const c = calc(t);
     let lo = 0, hi = cl.length;
     while (lo < hi) { const m = (lo + hi) >> 1; if (cl[m].closeAt < t.openAt) lo = m + 1; else hi = m; }
     const eq = Math.max(cap + pre[lo], 1);
+    const c = calc(t, eq);
     const viol = violList(t, c, eq);
     const chk = items.length ? items.filter(i => t.checks.includes(i.id)).length / items.length : null;
     S.D[t.id] = {...c, viol, chk, eq, compliant: viol.length === 0 && t.mistakes.length === 0};
@@ -485,7 +498,7 @@ function vDashboard(){
   <div class="strip mb">${kpis}</div>
   ${list.length ? `<div class="grid g2 mb"><div class="card"><h3>回撤曲線 <small>峰值回落 %</small></h3><div class="chart sm"><canvas id="ch_dd"></canvas></div></div><div class="card"><h3>每日盈虧 <small>近 30 個交易日</small></h3><div class="chart sm"><canvas id="ch_day"></canvas></div></div></div>` : `<div class="card mb">${empty('此區間沒有已平倉交易')}</div>`}
   <div class="grid g2"><div class="card"><h3>最近交易 <button class="btn sm" data-act="nav" data-v="trades">全部</button></h3>${recent || empty()}</div>
-  <div class="card"><h3>持倉中</h3>${open.length ? open.map(t => { const d = S.D[t.id]; return `<div class="list-item" data-act="view" data-id="${t.id}"><span><b>${esc(t.coin)}</b> <span class="tag ${t.dir === 'Long' ? 'long' : 'short'}">${t.dir === 'Long' ? '多' : '空'} ${t.lev}X</span><small class="muted" style="display:block">開倉 ${price(t.entry)} · 風險 ${d.risk != null ? usd(d.risk) : '未設止損'}</small></span><button class="btn sm" data-act="edit" data-id="${t.id}">平倉</button></div>`; }).join('') : empty('目前沒有持倉')}</div></div>`;
+  <div class="card"><h3>持倉中</h3>${open.length ? open.map(t => { const d = S.D[t.id]; return `<div class="list-item" data-act="view" data-id="${t.id}"><span><b>${esc(t.coin)}</b> <span class="tag ${t.dir === 'Long' ? 'long' : 'short'}">${t.dir === 'Long' ? '多' : '空'} ${t.lev}X</span><small class="muted" style="display:block">開倉 ${price(t.entry)} · 風險 ${d.risk != null ? usd(d.risk) : '未設止損'}${d.closedPct > 0 ? ' · 已平 ' + fmt(d.closedPct, 0) + '% (' + money(d.partial) + ')' : ''}</small></span><button class="btn sm" data-act="edit" data-id="${t.id}">平倉</button></div>`; }).join('') : empty('目前沒有持倉')}</div></div>`;
 }
 
 function filtered(){
@@ -514,10 +527,10 @@ function tradeRow(t){
   <td class="num">${fmtDT(t.openAt)}<small>${t.closeAt ? '→ ' + fmtDT(t.closeAt) : ''}</small></td>
   <td><b>${esc(t.coin)}</b> <span class="tag ${t.dir === 'Long' ? 'long' : 'short'}">${t.dir === 'Long' ? '多' : '空'} ${t.lev}X</span><small>${esc(t.exchange)}</small></td>
   <td class="r num">$${fmt(t.notional)}<small>保證金 $${fmt(d.margin)}</small></td>
-  <td class="r num">${price(t.entry)}<small>${t.exit != null ? '→ ' + price(t.exit) : '<span class="tag open">持倉中</span>'}</small></td>
+  <td class="r num">${price(t.entry)}<small>${t.exit != null ? '→ ' + price(t.exit) : '<span class="tag open">' + (d.closedPct > 0 ? '已平 ' + fmt(d.closedPct, 0) + '%' : '持倉中') + '</span>'}</small></td>
   <td class="r num">${t.sl != null ? price(t.sl) : '<span class="warn">未設</span>'}<small>${t.tp != null ? 'TP ' + price(t.tp) : ''}</small></td>
   <td class="r num ${sgn(d.R)}">${d.R != null ? fmt(d.R, 2) + 'R' : '—'}</td>
-  <td class="r num ${sgn(d.net)}"><b>${d.net != null ? money(d.net) : '—'}</b><small>${d.roi != null ? pct(d.roi) + ' 保證金' : ''}</small></td>
+  <td class="r num ${sgn(d.net != null ? d.net : d.partial)}"><b>${d.net != null ? money(d.net) : (d.closedPct > 0 ? money(d.partial) : '—')}</b><small>${d.roi != null ? pct(d.roi) + ' 保證金' : (d.closedPct > 0 ? '部分已實現' : '')}</small></td>
   <td>${esc(t.strategy) || '<span class="muted">—</span>'}</td>
   <td>${t.exit != null ? dis : '<span class="muted">—</span>'}</td>
   <td class="r" style="white-space:nowrap"><button class="btn sm" data-act="edit" data-id="${t.id}">編輯</button> <button class="btn sm danger" data-act="del" data-id="${t.id}">刪除</button></td></tr>`;
@@ -553,7 +566,7 @@ const DIMS = {
   dir:{n:'方向', k:t => t.dir === 'Long' ? '多頭' : '空頭'}, lev:{n:'槓桿', k:t => lvB(t.lev), ord:['1–5X','6–10X','11–20X','21–50X','50X 以上']},
   wd:{n:'星期', k:t => '週' + '日一二三四五六'[new Date(t.openAt).getDay()], ord:['週一','週二','週三','週四','週五','週六','週日']},
   hour:{n:'開倉時段', k:t => { const h = Math.floor(+t.openAt.slice(11, 13) / 3) * 3; return `${pad(h)}–${pad(h + 3)}時`; }},
-  emotion:{n:'情緒', k:t => t.emotion || '未填'}, tf:{n:'週期', k:t => t.tf || '未填', ord:['1m','5m','15m','1h','4h','1D','未填']}
+  emotion:{n:'情緒', k:t => t.emotion || '未填'}, mode:{n:'保證金模式', k:t => MODES[t.mode] || '全倉'}, tf:{n:'週期', k:t => t.tf || '未填', ord:['1m','5m','15m','1h','4h','1D','未填']}
 };
 function vAnalytics(){
   const {list, base} = dataset(); if (!list.length) return `<div class="card">${empty('此區間沒有已平倉交易可供分析')}</div>`;
@@ -649,6 +662,8 @@ function vSettings(){
     ${fld('起始本金 (USDT)', 'capital', s.capital, 'number', 'min="1" step="any"')}
     ${fld('開倉手續費率 (%)', 'feeRate.open', s.feeRate.open, 'number', 'min="0" step="0.0001"')}${fld('平倉手續費率 (%)', 'feeRate.close', s.feeRate.close, 'number', 'min="0" step="0.0001"')}
     <p class="muted" style="font-size:12px;margin:-4px 0 12px">依你在派網帳戶實際適用的費率填寫，只用於表單的「依費率估算」按鈕。</p>
+    ${fld('維持保證金率 (%)', 'mmr', s.mmr, 'number', 'min="0" step="0.01"')}
+    <p class="muted" style="font-size:12px;margin:-4px 0 12px">用來估算強平價。不同幣種與倉位大小的實際值不同，估算僅供參考，表單可直接填入派網顯示的強平價。</p>
     <div class="field"><label class="fl">主題</label><select data-set="theme" style="width:100%"><option value="auto" ${s.theme === 'auto' ? 'selected' : ''}>跟隨系統</option><option value="light" ${s.theme === 'light' ? 'selected' : ''}>淺色</option><option value="dark" ${s.theme === 'dark' ? 'selected' : ''}>深色</option></select></div></div>
   <div class="card"><h3>風控與紀律規則 <small>違反時會在交易紀錄中標示</small></h3>
     ${fld('單筆最大風險 (% 淨值)', 'rules.maxRiskPct', r.maxRiskPct, 'number', 'min="0.1" step="0.1"')}${fld('單日最大虧損 (USDT)', 'rules.maxDailyLoss', r.maxDailyLoss, 'number', 'min="0" step="any"')}
@@ -661,6 +676,7 @@ function vSettings(){
 function later(fn){ LATER.push(fn); }
 
 /* ============ grid bots ============ */
+const MODES = {cross:'全倉', isolated:'逐倉', split:'分倉'};
 const GKIND = {futures:'合約網格', spot:'現貨網格'}, GDIR = {Long:'做多', Short:'做空', Neutral:'中性'};
 function normGrid(o){
   if (!o || typeof o !== 'object') return null;
@@ -763,7 +779,7 @@ async function submitGrid(e){
 /* ============ trade form ============ */
 function field(label, id, val, type = 'number', extra = ''){ return `<div class="field"><label class="fl" for="${id}">${label}</label><input type="${type}" id="${id}" value="${esc(val ?? '')}" ${extra}></div>`; }
 function openForm(id, preset){
-  const t = id ? S.trades.find(x => x.id === id) : (preset || {dir:'Long', lev:10, openAt:nowLocal(), checks:[], mistakes:[], rating:0, emotion:'冷靜', fees:0, exchange:(S.settings.exchanges[0] || '')});
+  const t = id ? S.trades.find(x => x.id === id) : (preset || {dir:'Long', lev:10, openAt:nowLocal(), checks:[], mistakes:[], rating:0, emotion:'冷靜', fees:0, mode:'cross', closes:[], exchange:(S.settings.exchanges[0] || '')});
   const s = S.settings; FORM = {shot:t.shot || null, editId:id || null};
   const dl = (name, arr) => `<datalist id="${name}">${[...new Set(arr)].map(x => `<option value="${esc(x)}">`).join('')}</datalist>`;
   openModal(`<div class="dlg"><div class="dh"><h2>${id ? '編輯交易' : '新增交易'}</h2><button class="btn sm" data-act="close">關閉</button></div>
@@ -772,13 +788,16 @@ function openForm(id, preset){
       <div class="row2"><div class="field"><label class="fl">方向</label><div class="seg"><label><input type="radio" name="f_dir" value="Long" ${t.dir === 'Long' ? 'checked' : ''}><span>多頭 Long</span></label><label><input type="radio" name="f_dir" value="Short" ${t.dir === 'Short' ? 'checked' : ''}><span>空頭 Short</span></label></div></div>
       ${field('幣種', 'f_coin', t.coin, 'text', 'list="dl_coin" placeholder="BTC" autocomplete="off" maxlength="20"')}</div>
       <div class="row2">${field('槓桿 (X)', 'f_lev', t.lev, 'number', 'min="1" step="1"')}${field('倉位價值 (USDT)', 'f_notional', t.notional, 'number', 'min="0" step="any" placeholder="1000"')}</div>
+      <div class="row3"><div class="field"><label class="fl" for="f_mode">保證金模式</label><select id="f_mode" style="width:100%"><option value="cross" ${(t.mode || 'cross') === 'cross' ? 'selected' : ''}>全倉</option><option value="isolated" ${t.mode === 'isolated' ? 'selected' : ''}>逐倉</option><option value="split" ${t.mode === 'split' ? 'selected' : ''}>分倉</option></select></div>${field('動用保證金總額 (USDT)', 'f_mbal', t.mbal, 'number', 'min="0" step="any" placeholder="留空自動"')}${field('派網顯示的強平價（選填）', 'f_liq', t.liqPx, 'number', 'min="0" step="any"')}</div>
+      <p class="muted" style="font-size:12px;margin:-4px 0 10px">全倉：填帳戶可動用餘額，留空則用日誌的帳戶淨值；同時有多筆持倉請自行扣除其他倉位占用。逐倉與分倉：填該倉位自己的保證金（含追加），留空則用倉位價值 ÷ 槓桿。強平價有填會優先使用。</p>
       <div class="row3">${field('平台', 'f_ex', t.exchange, 'text', 'list="dl_ex" maxlength="60"')}${field('策略', 'f_str', t.strategy, 'text', 'list="dl_str" maxlength="60"')}
       <div class="field"><label class="fl" for="f_tf">交易週期</label><select id="f_tf" style="width:100%"><option value="">未填</option>${TFS.map(x => `<option ${t.tf === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div></div></div>
-    <div class="fs"><h4>價格與時間 <span class="muted" style="font-weight:400">· 平倉價留空 = 持倉中</span></h4>
+    <div class="fs"><h4>價格與時間</h4>
       <div class="row3">${field('開倉價', 'f_entry', t.entry, 'number', 'min="0" step="any"')}${field('止損價', 'f_sl', t.sl, 'number', 'min="0" step="any"')}${field('止盈價', 'f_tp', t.tp, 'number', 'min="0" step="any"')}</div>
-      <div class="row3">${field('平倉價', 'f_exit', t.exit, 'number', 'min="0" step="any"')}${field('開倉時間', 'f_open', t.openAt, 'datetime-local')}${field('平倉時間', 'f_close', t.closeAt || '', 'datetime-local')}</div></div>
-    <div class="fs"><h4>費用 <span class="muted" style="font-weight:400">· 開、平倉各收一次手續費，另有資金費</span> <button type="button" class="btn sm" data-act="feeest" style="float:right">依費率估算</button></h4>
-      <div class="row3">${field('開倉手續費 (USDT)', 'f_feeo', t.feeOpen ?? 0, 'number', 'min="0" step="any"')}${field('平倉手續費 (USDT)', 'f_feec', t.feeClose ?? 0, 'number', 'min="0" step="any"')}${field('資金費 (USDT)', 'f_fund', t.funding ?? 0, 'number', 'step="any"')}</div>
+      <div class="row3">${field('開倉時間', 'f_open', t.openAt, 'datetime-local')}</div></div>
+    <div class="fs"><h4>平倉紀錄 <span class="muted" style="font-weight:400">· 可分批平倉，累計 100% 才算已平倉</span> <button type="button" class="btn sm" data-act="addclose" style="float:right">＋ 新增平倉</button></h4><div id="closes"></div><div id="clsum" class="muted" style="font-size:12.5px"></div></div>
+    <div class="fs"><h4>費用 <span class="muted" style="font-weight:400">· 開倉手續費與資金費；平倉手續費記在各筆平倉紀錄</span> <button type="button" class="btn sm" data-act="feeest" style="float:right">依費率估算</button></h4>
+      <div class="row2">${field('開倉手續費 (USDT)', 'f_feeo', t.feeOpen ?? 0, 'number', 'min="0" step="any"')}${field('資金費 (USDT)', 'f_fund', t.funding ?? 0, 'number', 'step="any"')}</div>
       <p class="muted" style="font-size:12px">資金費：付出填正數，收到填負數。費率可在「設定」填入，供「依費率估算」使用。</p></div>
     <div class="fs"><h4>進場前檢查清單</h4>${s.checklist.map(i => `<label class="chk"><input type="checkbox" class="f_chk" value="${i.id}" ${t.checks.includes(i.id) ? 'checked' : ''}><span>${esc(i.text)}</span></label>`).join('') || '<p class="muted">尚未設定清單，可至設定頁新增</p>'}</div>
     <div class="fs"><h4>執行品質</h4>
@@ -791,19 +810,37 @@ function openForm(id, preset){
       <div class="field"><label class="fl">圖表截圖</label><button type="button" class="btn sm" data-act="pickshot">選擇圖片</button> <button type="button" class="btn sm danger" data-act="rmshot" id="rmshot" style="${FORM.shot ? '' : 'display:none'}">移除</button><div id="shotbox">${FORM.shot ? `<img class="shot" src="${FORM.shot}" alt="截圖">` : ''}</div></div></div>
   </div><div><div class="pv" id="pv"></div></div></div></div>
   <div class="df"><span id="ferr" class="neg" style="margin-right:auto;align-self:center"></span><button type="button" class="btn" data-act="close">取消</button><button type="submit" class="btn primary">${id ? '儲存變更' : '記錄交易'}</button></div></form>
-  ${dl('dl_coin', [...COINS, ...S.trades.map(x => x.coin)])}${dl('dl_ex', [...s.exchanges, ...S.trades.map(x => x.exchange).filter(Boolean)])}${dl('dl_str', [...s.strategies, ...S.trades.map(x => x.strategy).filter(Boolean)])}</div>`);
+  ${dl('dl_coin', [...COINS, ...S.trades.map(x => x.coin)])}${dl('dl_ex', [...s.exchanges, ...S.trades.map(x => x.exchange).filter(Boolean)])}${dl('dl_str', [...s.strategies, ...S.trades.map(x => x.strategy).filter(Boolean)])}<datalist id="dl_pct"><option value="25"><option value="50"><option value="75"><option value="100"></datalist></div>`);
+  (t.closes || []).forEach(addCloseRow);
   updatePV();
 }
+function addCloseRow(c){
+  c = c || {};
+  const cur = $$('#closes .crow').reduce((a, r) => a + (num(r.querySelector('.cl_pct').value) || 0), 0);
+  const el = document.createElement('div'); el.className = 'crow';
+  el.innerHTML = `<div><label class="fl">平倉價</label><input type="number" class="cl_price" step="any" min="0" value="${c.price ?? ''}"></div>
+  <div><label class="fl">比例 %</label><input type="number" class="cl_pct" step="any" min="0" max="100" list="dl_pct" value="${c.pct ?? Math.max(0, +(100 - cur).toFixed(2))}"></div>
+  <div><label class="fl">時間</label><input type="datetime-local" class="cl_at" value="${esc(c.at || nowLocal())}"></div>
+  <div><label class="fl">手續費</label><input type="number" class="cl_fee" step="any" min="0" value="${c.fee ?? 0}"></div>
+  <button type="button" class="btn sm danger" data-act="rmclose" title="移除">✕</button>`;
+  $('#closes').appendChild(el);
+}
 function readForm(){
-  const g = id => $('#' + id).value, exit = num(g('f_exit'));
-  return {id:FORM.editId || uid(), coin:g('f_coin').trim().toUpperCase(), dir:$('input[name=f_dir]:checked').value, lev:Math.round(num(g('f_lev')) || 0), notional:num(g('f_notional')),
-    entry:num(g('f_entry')), exit, sl:num(g('f_sl')), tp:num(g('f_tp')), feeOpen:num(g('f_feeo')) || 0, feeClose:num(g('f_feec')) || 0, funding:num(g('f_fund')) || 0, fees:(num(g('f_feeo')) || 0) + (num(g('f_feec')) || 0) + (num(g('f_fund')) || 0), openAt:g('f_open'), closeAt:exit != null ? (g('f_close') || nowLocal()) : null,
+  const g = id => $('#' + id).value;
+  const rows = $$('#closes .crow').map(r => ({price:num(r.querySelector('.cl_price').value), pct:num(r.querySelector('.cl_pct').value), at:r.querySelector('.cl_at').value, fee:num(r.querySelector('.cl_fee').value) || 0}));
+  const ok = rows.filter(c => c.price > 0 && c.pct > 0 && c.pct <= 100 && c.at);
+  const t = {id:FORM.editId || uid(), coin:g('f_coin').trim().toUpperCase(), dir:$('input[name=f_dir]:checked').value, lev:Math.round(num(g('f_lev')) || 0), notional:num(g('f_notional')),
+    mode:g('f_mode'), mbal:num(g('f_mbal')), liqPx:num(g('f_liq')), entry:num(g('f_entry')), exit:null, sl:num(g('f_sl')), tp:num(g('f_tp')),
+    feeOpen:num(g('f_feeo')) || 0, funding:num(g('f_fund')) || 0, openAt:g('f_open'), closeAt:null, closes:ok, _bad:rows.length - ok.length,
     exchange:g('f_ex').trim(), strategy:g('f_str').trim(), tf:g('f_tf'), emotion:g('f_emo'), rating:+g('f_rate'), checks:$$('.f_chk:checked').map(x => x.value), mistakes:$$('.f_mis:checked').map(x => x.value),
     notes:g('f_notes').trim(), review:g('f_rev').trim(), shot:FORM.shot};
+  deriveClose(t); return t;
 }
+const tp100 = t => sum(t.closes.map(x => x.pct)) > 100.0001;
 function updatePV(){
   const pv = $('#pv'); if (!pv) return;
   const t = readForm(), ok = t.entry > 0 && t.notional > 0 && t.lev > 0;
+  const cs = $('#clsum'); if (cs) { const tp = sum(t.closes.map(x => x.pct)); cs.textContent = t.closes.length ? `累計已平倉 ${fmt(tp, 1)}%，剩餘 ${fmt(Math.max(0, 100 - tp), 1)}%${tp > 100.0001 ? '（超過 100%）' : ''}` : '尚未平倉（持倉中）'; cs.className = tp100(t) ? 'neg' : 'muted'; }
   if (!ok) { pv.innerHTML = '<h4>即時試算</h4><p class="muted">輸入開倉價、倉位價值與槓桿後，這裡會即時計算風險與盈虧。</p>'; return; }
   const c = calc(t), eq = Math.max(S.equity, 1), v = violList(t, c, eq), warns = [];
   if (c.slWrong) warns.push(['bad', `止損價位置不合理（${t.dir === 'Long' ? '多單止損應低於開倉價' : '空單止損應高於開倉價'}）`]);
@@ -815,7 +852,7 @@ function updatePV(){
   if (!warns.length && t.sl != null) warns.push(['ok', '符合所有風控規則']);
   const head = c.net != null ? `<div class="big ${sgn(c.net)}">${money(c.net)}</div>` : `<div class="big muted">持倉中</div>`;
   pv.innerHTML = `<h4>${c.net != null ? '實際淨盈虧' : '即時試算'}</h4>${head}<dl>
-    <dt>合約數量</dt><dd>${fmt(c.size, 4)}</dd><dt>保證金</dt><dd>$${fmt(c.margin)}</dd><dt>估算強平價</dt><dd>${price(c.liq)}</dd>
+    <dt>合約數量</dt><dd>${fmt(c.size, 4)}</dd><dt>保證金</dt><dd>$${fmt(c.margin)}</dd><dt>${t.liqPx > 0 ? '強平價（派網）' : '估算強平價'}</dt><dd>${price(c.liq)}${c.liqDist != null ? ' (' + fmt(c.liqDist * 100, 1) + '%)' : ''}</dd>
     <dt>止損風險</dt><dd>${c.risk != null ? usd(c.risk) + ' (' + fmt(c.risk / eq * 100, 2) + '%)' : '未設定'}</dd><dt>預期盈虧比</dt><dd>${c.rr != null ? fmt(c.rr, 2) : '—'}</dd>
     ${c.net != null ? `<dt>費用合計</dt><dd>${usd(t.fees)}</dd><dt>毛盈虧</dt><dd class="${sgn(c.gross)}">${money(c.gross)}</dd><dt>R 倍數</dt><dd class="${sgn(c.R)}">${c.R != null ? fmt(c.R, 2) + 'R' : '—'}</dd><dt>保證金報酬率</dt><dd class="${sgn(c.roi)}">${pct(c.roi)}</dd>` : ''}</dl>
     ${warns.length ? `<ul>${warns.map(w => `<li class="${w[0]}">${esc(w[1])}</li>`).join('')}</ul>` : ''}`;
@@ -828,8 +865,9 @@ async function submitForm(e){
   if (!(t.notional > 0)) return err('請輸入倉位價值');
   if (!(t.entry > 0)) return err('請輸入開倉價');
   if (!t.openAt) return err('請選擇開倉時間');
-  if (t.exit != null && !(t.exit > 0)) return err('平倉價必須大於 0');
-  if (t.exit != null && t.closeAt < t.openAt) return err('平倉時間不能早於開倉時間');
+  if (t._bad) return err('平倉紀錄有欄位未填完整：需要平倉價、比例（0–100%）與時間');
+  if (tp100(t)) return err('累計平倉比例不能超過 100%');
+  if (t.closes.some(c => c.at < t.openAt)) return err('平倉時間不能早於開倉時間');
   const old = S.trades.find(x => x.id === t.id); if (old && old.demo) t.demo = true; t.updatedAt = Date.now();
   const n = norm(t); if (!n) return err('資料格式有誤，請檢查欄位');
   const i = S.trades.findIndex(x => x.id === n.id); if (i >= 0) S.trades[i] = n; else S.trades.push(n);
@@ -853,10 +891,12 @@ function openDetail(id){
     <div><span>保證金報酬率</span><b class="${sgn(d.roi)}">${pct(d.roi)}</b></div><div><span>持倉時間</span><b>${fmtDur(d.hold)}</b></div>
     <div><span>倉位價值 / 數量</span><b>$${fmt(t.notional)} / ${fmt(d.size, 4)}</b></div><div><span>開倉 → 平倉</span><b>${price(t.entry)} → ${price(t.exit)}</b></div>
     <div><span>止損 / 止盈</span><b>${price(t.sl)} / ${price(t.tp)}</b></div><div><span>開 / 平倉手續費</span><b>${usd(t.feeOpen)} / ${usd(t.feeClose)}</b></div><div><span>資金費</span><b>${usd(t.funding)}</b></div>
+    <div><span>保證金模式</span><b>${MODES[t.mode] || '全倉'}</b></div><div><span>強平價${t.liqPx > 0 ? '（派網）' : '（估算）'} / 距離</span><b>${price(d.liq)}${d.liqDist != null ? ' / ' + fmt(d.liqDist * 100, 1) + '%' : ''}</b></div>
     <div><span>風險金額</span><b>${d.risk != null ? usd(d.risk) + ' (' + fmt(d.risk / d.eq * 100, 2) + '%)' : '未設定'}</b></div><div><span>預期盈虧比</span><b>${d.rr != null ? fmt(d.rr, 2) : '—'}</b></div>
     <div><span>平台 / 策略</span><b>${esc(t.exchange) || '—'} / ${esc(t.strategy) || '—'}</b></div><div><span>週期 / 情緒 / 評分</span><b>${esc(t.tf) || '—'} / ${esc(t.emotion) || '—'} / ${t.rating ? '★'.repeat(t.rating) : '—'}</b></div>
     <div><span>開倉時間</span><b>${fmtDT(t.openAt)}</b></div><div><span>平倉時間</span><b>${fmtDT(t.closeAt)}</b></div></div>
   ${t.exit != null ? `<div class="alert ${d.compliant ? 'info' : 'bad'}"><div><b>${d.compliant ? '這筆交易符合紀律' : '這筆交易有違規'}</b>${[...t.mistakes, ...d.viol.map(v => v.msg)].length ? '：' + esc([...t.mistakes, ...d.viol.map(v => v.msg)].join('、')) : ''}</div></div>` : ''}
+  ${t.closes.length ? `<div class="fs"><h4>平倉紀錄</h4>${t.closes.map(c => `<div class="list-item" style="cursor:default"><span>${fmtDT(c.at)} · ${price(c.price)}</span><span>${fmt(c.pct, 1)}% · 手續費 ${usd(c.fee)}</span></div>`).join('')}</div>` : ''}
   <div class="fs"><h4>進場前檢查清單 ${d.chk != null ? `<span class="muted" style="font-weight:400">· 完成 ${pct(d.chk, 0)}</span>` : ''}</h4>${items.map(i => `<div class="chk" style="cursor:default"><span class="${t.checks.includes(i.id) ? 'pos' : 'neg'}">${t.checks.includes(i.id) ? '✓' : '✗'}</span><span>${esc(i.text)}</span></div>`).join('') || '<span class="muted">未設定清單</span>'}</div>
   ${t.notes ? `<div class="fs"><h4>進場理由與計畫</h4><div class="note">${esc(t.notes)}</div></div>` : ''}${t.review ? `<div class="fs"><h4>復盤心得</h4><div class="note">${esc(t.review)}</div></div>` : ''}
   ${t.shot ? `<div class="fs"><h4>圖表截圖</h4><img class="shot" src="${t.shot}" data-act="img" alt="截圖"></div>` : ''}</div>
@@ -865,12 +905,12 @@ function openDetail(id){
 
 /* ============ data actions ============ */
 function csvExport(){
-  const head = ['狀態','幣種','方向','槓桿','倉位價值','數量','開倉價','平倉價','止損','止盈','開倉手續費','平倉手續費','資金費','費用合計','毛盈虧','淨盈虧','保證金報酬率','R倍數','開倉時間','平倉時間','平台','策略','週期','情緒','評分','錯誤標籤','違規','清單完成率','進場計畫','復盤'];
+  const head = ['狀態','幣種','方向','槓桿','倉位價值','數量','開倉價','平倉價','止損','止盈','開倉手續費','平倉手續費','資金費','費用合計','毛盈虧','淨盈虧','保證金報酬率','R倍數','開倉時間','平倉時間','平台','策略','週期','情緒','評分','錯誤標籤','違規','清單完成率','進場計畫','復盤','保證金模式','強平價','平倉明細'];
   const q = v => { const s = String(v ?? ''); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const tx = v => { const s = String(v ?? ''); return /^[=+\-@\t\r]/.test(s) ? "'" + s : s; };
   const r = (n, d = 4) => n == null ? '' : +n.toFixed(d);
   const rows = [...S.trades].sort((a, b) => a.openAt < b.openAt ? -1 : 1).map(t => { const d = S.D[t.id];
-    return [t.exit == null ? '持倉中' : '已平倉', tx(t.coin), t.dir, t.lev, t.notional, r(d.size, 6), t.entry, t.exit ?? '', t.sl ?? '', t.tp ?? '', t.feeOpen, t.feeClose, t.funding, t.fees, r(d.gross, 4), r(d.net, 4), r(d.roi, 4), r(d.R, 3), t.openAt, t.closeAt ?? '', tx(t.exchange), tx(t.strategy), t.tf, t.emotion, t.rating || '', tx(t.mistakes.join('|')), tx(d.viol.map(v => v.msg).join('|')), d.chk != null ? r(d.chk, 2) : '', tx(t.notes), tx(t.review)].map(q).join(','); });
+    return [t.exit == null ? '持倉中' : '已平倉', tx(t.coin), t.dir, t.lev, t.notional, r(d.size, 6), t.entry, t.exit ?? '', t.sl ?? '', t.tp ?? '', t.feeOpen, t.feeClose, t.funding, t.fees, r(d.gross, 4), r(d.net, 4), r(d.roi, 4), r(d.R, 3), t.openAt, t.closeAt ?? '', tx(t.exchange), tx(t.strategy), t.tf, t.emotion, t.rating || '', tx(t.mistakes.join('|')), tx(d.viol.map(v => v.msg).join('|')), d.chk != null ? r(d.chk, 2) : '', tx(t.notes), tx(t.review), MODES[t.mode] || '全倉', r(d.liq, 6), tx(t.closes.map(c => c.price + 'x' + c.pct + '%').join('|'))].map(q).join(','); });
   download('\ufeff' + head.join(',') + '\r\n' + rows.join('\r\n'), `trades-${today()}.csv`, 'text/csv;charset=utf-8');
   toast('已匯出 CSV');
 }
@@ -899,7 +939,7 @@ function mergeSettings(o){
   const r = o.rules || {};
   s.rules = {maxRiskPct:pn(r.maxRiskPct, d.rules.maxRiskPct, 0, 100), maxDailyLoss:pn(r.maxDailyLoss, d.rules.maxDailyLoss), maxTradesPerDay:pn(r.maxTradesPerDay, d.rules.maxTradesPerDay, 0, 1000),
     maxLeverage:pn(r.maxLeverage, d.rules.maxLeverage, 1, 1000), requireSL:r.requireSL === undefined ? d.rules.requireSL : !!r.requireSL};
-  const fr = o.feeRate || {}; s.feeRate = {open:pn(fr.open, 0, 0, 100), close:pn(fr.close, 0, 0, 100)};
+  const fr = o.feeRate || {}; s.feeRate = {open:pn(fr.open, 0, 0, 100), close:pn(fr.close, 0, 0, 100)}; s.mmr = pn(o.mmr, 0.5, 0, 50);
   const strs = (a, dv) => Array.isArray(a) ? a.map(x => String(x ?? '').slice(0, 60)).filter(Boolean).slice(0, 50) : dv;
   s.checklist = Array.isArray(o.checklist) ? o.checklist.filter(x => x && x.id && x.text).map(x => ({id:String(x.id).slice(0, 40), text:String(x.text).slice(0, 60)})).slice(0, 50) : d.checklist;
   s.mistakes = strs(o.mistakes, d.mistakes); s.strategies = strs(o.strategies, d.strategies); s.exchanges = strs(o.exchanges, d.exchanges);
@@ -932,7 +972,7 @@ function demoTrades(){
 const ACT = {
   new:() => S.view === 'grid' ? openGridForm() : openForm(), gedit:(el, id) => openGridForm(id),
   gdel:async (el, id) => { if (!(await confirmBox('刪除這個網格紀錄？', '刪除後無法復原。', '刪除', true))) return; S.grids = S.grids.filter(x => x.id !== id); await saveGrids(); render(); toast('已刪除'); }, close:() => closeModal(), view:(el, id) => openDetail(id), edit:(el, id) => { openForm(id); },
-  dup:(el, id) => { const t = S.trades.find(x => x.id === id); openForm(null, {...t, id:null, exit:null, closeAt:null, openAt:nowLocal(), review:'', shot:null, mistakes:[], checks:[], rating:0, fees:0, feeOpen:0, feeClose:0, funding:0, demo:false}); },
+  dup:(el, id) => { const t = S.trades.find(x => x.id === id); openForm(null, {...t, id:null, exit:null, closeAt:null, closes:[], openAt:nowLocal(), review:'', shot:null, mistakes:[], checks:[], rating:0, fees:0, feeOpen:0, feeClose:0, funding:0, demo:false}); },
   del:async (el, id) => {
     if (!(await confirmBox('刪除這筆交易？', '刪除後無法復原。', '刪除', true))) return;
     S.trades = S.trades.filter(x => x.id !== id); await persist(() => IDB.del(id)); recompute(); closeModal(); render(); toast('已刪除');
@@ -942,12 +982,14 @@ const ACT = {
   calprev:() => { S.cal = new Date(S.cal.getFullYear(), S.cal.getMonth() - 1, 1); render(); },
   calnext:() => { S.cal = new Date(S.cal.getFullYear(), S.cal.getMonth() + 1, 1); render(); },
   caltoday:() => { S.cal = new Date(); render(); },
+  addclose:() => { addCloseRow(); updatePV(); },
+  rmclose:(el) => { el.closest('.crow').remove(); updatePV(); },
   feeest:() => {
     const r = S.settings.feeRate || {open:0, close:0};
     if (!(r.open > 0 || r.close > 0)) { toast('請先到設定填入手續費率'); return; }
     const t = readForm(); if (!(t.notional > 0) || !(t.entry > 0)) { toast('請先填入倉位價值與開倉價'); return; }
     $('#f_feeo').value = +(t.notional * r.open / 100).toFixed(4);
-    if (t.exit != null) $('#f_feec').value = +(t.notional / t.entry * t.exit * r.close / 100).toFixed(4); else toast('填入平倉價後可估算平倉手續費');
+    $$('#closes .crow').forEach(row => { const pr = num(row.querySelector('.cl_price').value), pc = num(row.querySelector('.cl_pct').value); if (pr > 0 && pc > 0) row.querySelector('.cl_fee').value = +(t.notional / t.entry * pr * pc / 100 * r.close / 100).toFixed(4); });
     updatePV();
   },
   cloud:openCloud, syncnow:() => { scheduleSync(0); toast('開始同步'); },
