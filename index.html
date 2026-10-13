@@ -305,10 +305,10 @@ function norm(o){
   const t = {
     id:str(o.id || uid(), 40), coin:str(o.coin, 20).toUpperCase().trim(), dir:o.dir === 'Short' ? 'Short' : 'Long',
     lev:Math.max(1, Math.round(n(o.lev) || 1)), notional:n(o.notional), entry:n(o.entry), exit:n(o.exit), sl:n(o.sl), tp:n(o.tp),
-    mode:['isolated', 'split'].includes(o.mode) ? o.mode : 'cross', mbal:(n(o.mbal) > 0 ? n(o.mbal) : null), liqPx:(n(o.liqPx) > 0 ? n(o.liqPx) : null), fees:0, feeOpen:0, feeClose:0, funding:0, closes:[], tps:[], openAt:str(o.openAt, 16), closeAt:null, exchange:str(o.exchange, 60), strategy:str(o.strategy, 60), tf:str(o.tf, 10),
+    mode:['isolated', 'split'].includes(o.mode) ? o.mode : 'cross', mbal:(n(o.mbal) > 0 ? n(o.mbal) : null), liqPx:(n(o.liqPx) > 0 ? n(o.liqPx) : null), actual:n(o.actual), fees:0, feeOpen:0, feeClose:0, funding:0, closes:[], tps:[], openAt:str(o.openAt, 16), closeAt:null, exchange:str(o.exchange, 60), strategy:str(o.strategy, 60), tf:str(o.tf, 10),
     emotion:str(o.emotion, 20), rating:Math.min(5, Math.max(0, Math.round(n(o.rating) || 0))),
     checks:Array.isArray(o.checks) ? o.checks.map(x => str(x, 40)) : [], mistakes:Array.isArray(o.mistakes) ? o.mistakes.map(x => str(x, 60)) : [],
-    notes:str(o.notes), review:str(o.review), shot:(typeof o.shot === 'string' && o.shot.startsWith('data:image/') && o.shot.length <= 700000) ? o.shot : null, demo:!!o.demo, updatedAt:Math.max(0, n(o.updatedAt) || 0)
+    notes:str(o.notes), review:str(o.review), shot:(typeof o.shot === 'string' && o.shot.startsWith('data:image/') && o.shot.length <= 700000) ? o.shot : null, demo:!!o.demo, updatedAt:Math.max(0, n(o.updatedAt) || 0), chartUrl:(typeof o.chartUrl === 'string' && /^https?:\/\/\S+$/i.test(o.chartUrl.trim()) && o.chartUrl.trim().length <= 500) ? o.chartUrl.trim() : ''
   };
   const split = o.feeOpen != null || o.feeClose != null || o.funding != null;
   t.feeOpen = split ? (n(o.feeOpen) || 0) : (n(o.fees) || 0); t.funding = split ? (n(o.funding) || 0) : 0;
@@ -328,7 +328,9 @@ function calc(t, eqIn){
   const margin = t.lev > 0 ? t.notional / t.lev : 0;
   const closed = t.exit != null, d = t.dir === 'Long' ? 1 : -1;
   const gross = closed ? (t.exit - t.entry) * d * size : null;
-  const net = closed ? gross - (t.fees || 0) : null;
+  const sysNet = closed ? gross - (t.fees || 0) : null;
+  const net = closed ? (t.actual != null ? t.actual : sysNet) : null;
+  const diff = (closed && t.actual != null) ? t.actual - sysNet : null;
   const risk = t.sl != null ? Math.abs(t.entry - t.sl) * size : null;
   const R = closed && risk > 0 ? net / risk : null;
   const rr = (t.sl != null && t.tp != null && t.sl !== t.entry) ? Math.abs(t.tp - t.entry) / Math.abs(t.entry - t.sl) : null;
@@ -342,7 +344,7 @@ function calc(t, eqIn){
   const slWrong = t.sl != null && (d === 1 ? t.sl >= t.entry : t.sl <= t.entry);
   const tpWrong = t.tp != null && (d === 1 ? t.tp <= t.entry : t.tp >= t.entry);
   const hold = closed && t.closeAt ? new Date(t.closeAt) - new Date(t.openAt) : null;
-  return {size, margin, gross, net, risk, R, rr, roi, liq, liqDist, closedPct, partial, slWrong, tpWrong, hold};
+  return {size, margin, gross, sysNet, diff, net, risk, R, rr, roi, liq, liqDist, closedPct, partial, slWrong, tpWrong, hold};
 }
 function violList(t, c, eq){
   const r = S.settings.rules, v = [];
@@ -536,7 +538,7 @@ function tradeRow(t){
   <td class="r num">${price(t.entry)}<small>${t.exit != null ? '→ ' + price(t.exit) : '<span class="tag open">' + (d.closedPct > 0 ? '已平 ' + fmt(d.closedPct, 0) + '%' : '持倉中') + '</span>'}</small></td>
   <td class="r num">${t.sl != null ? price(t.sl) : '<span class="warn">未設</span>'}<small>${t.tp != null ? 'TP ' + price(t.tp) : ''}</small></td>
   <td class="r num ${sgn(d.R)}">${d.R != null ? fmt(d.R, 2) + 'R' : '—'}</td>
-  <td class="r num ${sgn(d.net != null ? d.net : d.partial)}"><b>${d.net != null ? money(d.net) : (d.closedPct > 0 ? money(d.partial) : '—')}</b><small>${d.roi != null ? pct(d.roi) + ' 保證金' : (d.closedPct > 0 ? '部分已實現' : '')}</small></td>
+  <td class="r num ${sgn(d.net != null ? d.net : d.partial)}"><b>${d.net != null ? money(d.net) : (d.closedPct > 0 ? money(d.partial) : '—')}</b><small>${d.roi != null ? pct(d.roi) + ' 保證金' + (t.actual != null ? ' · 實際' : '') : (d.closedPct > 0 ? '部分已實現' : '')}</small></td>
   <td>${esc(t.strategy) || '<span class="muted">—</span>'}</td>
   <td>${t.exit != null ? dis : '<span class="muted">—</span>'}</td>
   <td class="r" style="white-space:nowrap"><button class="btn sm" data-act="edit" data-id="${t.id}">編輯</button> <button class="btn sm danger" data-act="del" data-id="${t.id}">刪除</button></td></tr>`;
@@ -562,7 +564,7 @@ function vTrades(){
     <span class="muted" id="tcount" style="margin-left:auto"></span>
     <button class="btn" data-act="csv">匯出 CSV</button>
   </div>
-  <div class="tw"><table><thead><tr><th>時間</th><th>幣種 / 方向</th><th class="r">倉位價值</th><th class="r">開倉 → 平倉</th><th class="r">止損 / 止盈</th><th class="r">R 倍數</th><th class="r">淨盈虧</th><th>策略</th><th>紀律</th><th></th></tr></thead><tbody id="tbody"></tbody></table></div>
+  <div class="tw"><table><thead><tr><th>時間</th><th>幣種 / 方向</th><th class="r">倉位價值</th><th class="r">開倉 → 平倉</th><th class="r">止損 / 止盈</th><th class="r">實際 R</th><th class="r">淨盈虧</th><th>策略</th><th>紀律</th><th></th></tr></thead><tbody id="tbody"></tbody></table></div>
   <div class="c" style="margin-top:14px"><button class="btn" id="more" data-act="more">載入更多</button></div>`;
 }
 
@@ -676,7 +678,7 @@ function vSettings(){
     ${fld('單日最多開倉筆數', 'rules.maxTradesPerDay', r.maxTradesPerDay, 'number', 'min="1" step="1"')}${fld('最高槓桿 (X)', 'rules.maxLeverage', r.maxLeverage, 'number', 'min="1" step="1"')}
     <label class="chk"><input type="checkbox" data-set="rules.requireSL" ${r.requireSL ? 'checked' : ''}><span>每筆交易必須設定止損</span></label></div></div>
   <div class="card mb"><h3>清單與標籤</h3><div class="grid g2"><div>${chipEditor('checklist', '進場前檢查清單', '例：已確認消息面')}${chipEditor('mistakes', '錯誤標籤', '例：沒等收線')}</div><div>${chipEditor('strategies', '策略', '例：假突破')}${chipEditor('exchanges', '交易平台', '例：Bitget')}</div></div></div>
-  <div class="card"><h3>資料管理</h3><p class="muted" style="margin-bottom:12px">資料只存在這台裝置的瀏覽器中。建議每週匯出一次 JSON 備份；換裝置時用匯入還原。</p>
+  <div class="card"><h3>資料管理</h3><p class="muted" style="margin-bottom:12px">資料預設只存在這台裝置的瀏覽器中。登入雲端後，交易與設定會同步，但截圖永遠只存本機：換裝置請用 JSON 備份帶走（備份含截圖），或改貼圖表連結。</p>
   <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="json">匯出完整備份 (JSON)</button><button class="btn" data-act="import">匯入備份</button><button class="btn" data-act="csv">匯出 CSV</button><button class="btn" data-act="demo">載入範例資料</button>${demoN ? `<button class="btn" data-act="rmdemo">移除範例資料 (${demoN})</button>` : ''}<button class="btn danger" data-act="wipe">清除全部資料</button></div></div>`;
 }
 function later(fn){ LATER.push(fn); }
@@ -803,6 +805,9 @@ function openForm(id, preset){
       <div class="row3">${field('開倉時間', 'f_open', t.openAt, 'datetime-local')}</div></div>
     <div class="fs"><h4>止盈計畫 (TP) <span class="muted" style="font-weight:400">· 可設多個，比例＝到該價要平掉的倉位 %</span> <span style="float:right;white-space:nowrap"><button type="button" class="btn sm" data-act="tpeven">均分比例</button> <button type="button" class="btn sm" data-act="addtp">＋ 新增 TP</button></span></h4><div id="tps"></div><div id="tpsum" class="muted" style="font-size:12.5px"></div></div>
     <div class="fs"><h4>平倉紀錄 <span class="muted" style="font-weight:400">· 可分批平倉，累計 100% 才算已平倉</span> <span style="float:right;white-space:nowrap"><button type="button" class="btn sm" data-act="tp2close">依 TP 帶入</button> <button type="button" class="btn sm" data-act="addclose">＋ 新增平倉</button></span></h4><div id="closes"></div><div id="clsum" class="muted" style="font-size:12.5px"></div></div>
+    <div class="fs"><h4>最終實際盈虧 <span class="muted" style="font-weight:400">· 選填，填派網顯示的最終數字</span></h4>
+      ${field('實際盈虧 (USDT)', 'f_actual', t.actual, 'number', 'step="any" placeholder="例：-12.34，留空則用系統推算"')}
+      <p class="muted" style="font-size:12px">有填就以這個數字為準（已含手續費與資金費）：實際盈虧比 (R)、保證金報酬率與所有統計都會跟著改，系統推算值與差額會保留在明細供對照。需要全部平倉後才會生效。</p></div>
     <div class="fs"><h4>費用 <span class="muted" style="font-weight:400">· 開倉手續費與資金費；平倉手續費記在各筆平倉紀錄</span> <button type="button" class="btn sm" data-act="feeest" style="float:right">依費率估算</button></h4>
       <div class="row2">${field('開倉手續費 (USDT)', 'f_feeo', t.feeOpen ?? 0, 'number', 'min="0" step="any"')}${field('資金費 (USDT)', 'f_fund', t.funding ?? 0, 'number', 'step="any"')}</div>
       <p class="muted" style="font-size:12px">資金費：付出填正數，收到填負數。費率可在「設定」填入，供「依費率估算」使用。</p></div>
@@ -814,7 +819,8 @@ function openForm(id, preset){
     <div class="fs"><h4>筆記</h4>
       <div class="field"><label class="fl" for="f_notes">進場理由與計畫</label><textarea id="f_notes" maxlength="2000">${esc(t.notes)}</textarea></div>
       <div class="field"><label class="fl" for="f_rev">復盤心得</label><textarea id="f_rev" maxlength="2000">${esc(t.review)}</textarea></div>
-      <div class="field"><label class="fl">圖表截圖</label><button type="button" class="btn sm" data-act="pickshot">選擇圖片</button> <button type="button" class="btn sm danger" data-act="rmshot" id="rmshot" style="${FORM.shot ? '' : 'display:none'}">移除</button><div id="shotbox">${FORM.shot ? `<img class="shot" src="${FORM.shot}" alt="截圖">` : ''}</div></div></div>
+      ${field('圖表連結（TradingView 快照等，選填）', 'f_url', t.chartUrl, 'text', 'placeholder="https://www.tradingview.com/x/..." maxlength="500" inputmode="url"')}
+      <div class="field"><label class="fl">圖表截圖 <span class="muted" style="font-weight:400">· 只存在這台裝置，不會同步到雲端</span></label><button type="button" class="btn sm" data-act="pickshot">選擇圖片</button> <button type="button" class="btn sm danger" data-act="rmshot" id="rmshot" style="${FORM.shot ? '' : 'display:none'}">移除</button><div id="shotbox">${FORM.shot ? `<img class="shot" src="${FORM.shot}" alt="截圖">` : ''}</div></div></div>
   </div><div><div class="pv" id="pv"></div></div></div></div>
   <div class="df"><span id="ferr" class="neg" style="margin-right:auto;align-self:center"></span><button type="button" class="btn" data-act="close">取消</button><button type="submit" class="btn primary">${id ? '儲存變更' : '記錄交易'}</button></div></form>
   ${dl('dl_coin', [...COINS, ...S.trades.map(x => x.coin)])}${dl('dl_ex', [...s.exchanges, ...S.trades.map(x => x.exchange).filter(Boolean)])}${dl('dl_str', [...s.strategies, ...S.trades.map(x => x.strategy).filter(Boolean)])}<datalist id="dl_pct"><option value="25"><option value="50"><option value="75"><option value="100"></datalist></div>`);
@@ -850,10 +856,10 @@ function readForm(){
   const tpRows = $$('#tps .trow').map(r => ({price:num(r.querySelector('.tp_price').value), pct:num(r.querySelector('.tp_pct').value)}));
   const fTp = tpRows.filter(x => x.price != null), okTp = fTp.filter(x => x.price > 0 && x.pct > 0 && x.pct <= 100);
   const t = {id:FORM.editId || uid(), coin:g('f_coin').trim().toUpperCase(), dir:$('input[name=f_dir]:checked').value, lev:Math.round(num(g('f_lev')) || 0), notional:num(g('f_notional')),
-    mode:g('f_mode'), mbal:num(g('f_mbal')), liqPx:num(g('f_liq')), entry:num(g('f_entry')), exit:null, sl:num(g('f_sl')), tp:null, tps:okTp, _badTp:fTp.length - okTp.length,
+    mode:g('f_mode'), mbal:num(g('f_mbal')), liqPx:num(g('f_liq')), actual:num(g('f_actual')), entry:num(g('f_entry')), exit:null, sl:num(g('f_sl')), tp:null, tps:okTp, _badTp:fTp.length - okTp.length,
     feeOpen:num(g('f_feeo')) || 0, funding:num(g('f_fund')) || 0, openAt:g('f_open'), closeAt:null, closes:ok, _bad:rows.length - ok.length,
     exchange:g('f_ex').trim(), strategy:g('f_str').trim(), tf:g('f_tf'), emotion:g('f_emo'), rating:+g('f_rate'), checks:$$('.f_chk:checked').map(x => x.value), mistakes:$$('.f_mis:checked').map(x => x.value),
-    notes:g('f_notes').trim(), review:g('f_rev').trim(), shot:FORM.shot};
+    notes:g('f_notes').trim(), review:g('f_rev').trim(), chartUrl:g('f_url').trim(), shot:FORM.shot};
   deriveClose(t); deriveTp(t); return t;
 }
 const tp100 = t => sum(t.closes.map(x => x.pct)) > 100.0001;
@@ -876,7 +882,7 @@ function updatePV(){
   pv.innerHTML = `<h4>${c.net != null ? '實際淨盈虧' : '即時試算'}</h4>${head}<dl>
     <dt>合約數量</dt><dd>${fmt(c.size, 4)}</dd><dt>保證金</dt><dd>$${fmt(c.margin)}</dd><dt>${t.liqPx > 0 ? '強平價（派網）' : '估算強平價'}</dt><dd>${price(c.liq)}${c.liqDist != null ? ' (' + fmt(c.liqDist * 100, 1) + '%)' : ''}</dd>
     <dt>止損風險</dt><dd>${c.risk != null ? usd(c.risk) + ' (' + fmt(c.risk / eq * 100, 2) + '%)' : '未設定'}</dd><dt>預期盈虧比</dt><dd>${c.rr != null ? fmt(c.rr, 2) : '—'}</dd>
-    ${c.net != null ? `<dt>費用合計</dt><dd>${usd(t.fees)}</dd><dt>毛盈虧</dt><dd class="${sgn(c.gross)}">${money(c.gross)}</dd><dt>R 倍數</dt><dd class="${sgn(c.R)}">${c.R != null ? fmt(c.R, 2) + 'R' : '—'}</dd><dt>保證金報酬率</dt><dd class="${sgn(c.roi)}">${pct(c.roi)}</dd>` : ''}</dl>
+    ${c.net != null ? `<dt>費用合計</dt><dd>${usd(t.fees)}</dd>${t.actual != null ? `<dt>系統推算淨盈虧</dt><dd>${money(c.sysNet)}</dd><dt>與實際差額</dt><dd class="${sgn(c.diff)}">${money(c.diff)}</dd>` : ''}<dt>毛盈虧</dt><dd class="${sgn(c.gross)}">${money(c.gross)}</dd><dt>實際盈虧比 (R)</dt><dd class="${sgn(c.R)}">${c.R != null ? fmt(c.R, 2) + 'R' : '—'}</dd><dt>保證金報酬率</dt><dd class="${sgn(c.roi)}">${pct(c.roi)}</dd>` : ''}</dl>
     ${warns.length ? `<ul>${warns.map(w => `<li class="${w[0]}">${esc(w[1])}</li>`).join('')}</ul>` : ''}`;
 }
 async function submitForm(e){
@@ -912,15 +918,17 @@ function openDetail(id){
   const t = S.trades.find(x => x.id === id); if (!t) return; const d = S.D[t.id], items = S.settings.checklist;
   openModal(`<div class="dlg"><div class="dh"><h2>${esc(t.coin)} <span class="tag ${t.dir === 'Long' ? 'long' : 'short'}">${t.dir === 'Long' ? '多' : '空'} ${t.lev}X</span> ${t.exit == null ? '<span class="tag open">持倉中</span>' : ''}</h2><button class="btn sm" data-act="close">關閉</button></div>
   <div class="db"><div class="kv">
-    <div><span>淨盈虧</span><b class="${sgn(d.net)}">${d.net != null ? money(d.net) : '持倉中'}</b></div><div><span>R 倍數</span><b class="${sgn(d.R)}">${d.R != null ? fmt(d.R, 2) + 'R' : '—'}</b></div>
+    <div><span>淨盈虧</span><b class="${sgn(d.net)}">${d.net != null ? money(d.net) : '持倉中'}</b></div><div><span>實際盈虧比 (R)</span><b class="${sgn(d.R)}">${d.R != null ? fmt(d.R, 2) + 'R' : '—'}</b></div>
     <div><span>保證金報酬率</span><b class="${sgn(d.roi)}">${pct(d.roi)}</b></div><div><span>持倉時間</span><b>${fmtDur(d.hold)}</b></div>
     <div><span>倉位價值 / 數量</span><b>$${fmt(t.notional)} / ${fmt(d.size, 4)}</b></div><div><span>開倉 → 平倉</span><b>${price(t.entry)} → ${price(t.exit)}</b></div>
     <div><span>止損 / 止盈</span><b>${price(t.sl)} / ${price(t.tp)}</b></div><div><span>開 / 平倉手續費</span><b>${usd(t.feeOpen)} / ${usd(t.feeClose)}</b></div><div><span>資金費</span><b>${usd(t.funding)}</b></div>
     <div><span>保證金模式</span><b>${MODES[t.mode] || '全倉'}</b></div><div><span>強平價${t.liqPx > 0 ? '（派網）' : '（估算）'} / 距離</span><b>${price(d.liq)}${d.liqDist != null ? ' / ' + fmt(d.liqDist * 100, 1) + '%' : ''}</b></div>
-    <div><span>風險金額</span><b>${d.risk != null ? usd(d.risk) + ' (' + fmt(d.risk / d.eq * 100, 2) + '%)' : '未設定'}</b></div><div><span>預期盈虧比</span><b>${d.rr != null ? fmt(d.rr, 2) : '—'}</b></div>
+    <div><span>風險金額</span><b>${d.risk != null ? usd(d.risk) + ' (' + fmt(d.risk / d.eq * 100, 2) + '%)' : '未設定'}</b></div>${t.actual != null && d.sysNet != null ? '<div><span>系統推算 / 差額</span><b>' + money(d.sysNet) + ' / ' + money(d.diff) + '</b></div>' : ''}
+    <div><span>預期盈虧比</span><b>${d.rr != null ? fmt(d.rr, 2) : '—'}</b></div>
     <div><span>平台 / 策略</span><b>${esc(t.exchange) || '—'} / ${esc(t.strategy) || '—'}</b></div><div><span>週期 / 情緒 / 評分</span><b>${esc(t.tf) || '—'} / ${esc(t.emotion) || '—'} / ${t.rating ? '★'.repeat(t.rating) : '—'}</b></div>
     <div><span>開倉時間</span><b>${fmtDT(t.openAt)}</b></div><div><span>平倉時間</span><b>${fmtDT(t.closeAt)}</b></div></div>
   ${t.exit != null ? `<div class="alert ${d.compliant ? 'info' : 'bad'}"><div><b>${d.compliant ? '這筆交易符合紀律' : '這筆交易有違規'}</b>${[...t.mistakes, ...d.viol.map(v => v.msg)].length ? '：' + esc([...t.mistakes, ...d.viol.map(v => v.msg)].join('、')) : ''}</div></div>` : ''}
+  ${t.chartUrl ? `<div class="fs"><h4>圖表連結</h4><a href="${esc(t.chartUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);word-break:break-all">${esc(t.chartUrl)}</a></div>` : ''}
   ${t.tps.length ? `<div class="fs"><h4>止盈計畫</h4>${t.tps.map((x, i) => `<div class="list-item" style="cursor:default"><span>TP${i + 1} · ${price(x.price)}</span><span>${fmt(x.pct, 1)}% 平倉${t.sl != null && t.sl !== t.entry ? ' · ' + fmt(Math.abs(x.price - t.entry) / Math.abs(t.entry - t.sl), 2) + 'R' : ''}</span></div>`).join('')}</div>` : ''}
   ${t.closes.length ? `<div class="fs"><h4>平倉紀錄</h4>${t.closes.map(c => `<div class="list-item" style="cursor:default"><span>${fmtDT(c.at)} · ${price(c.price)}</span><span>${fmt(c.pct, 1)}% · 手續費 ${usd(c.fee)}</span></div>`).join('')}</div>` : ''}
   <div class="fs"><h4>進場前檢查清單 ${d.chk != null ? `<span class="muted" style="font-weight:400">· 完成 ${pct(d.chk, 0)}</span>` : ''}</h4>${items.map(i => `<div class="chk" style="cursor:default"><span class="${t.checks.includes(i.id) ? 'pos' : 'neg'}">${t.checks.includes(i.id) ? '✓' : '✗'}</span><span>${esc(i.text)}</span></div>`).join('') || '<span class="muted">未設定清單</span>'}</div>
@@ -931,12 +939,12 @@ function openDetail(id){
 
 /* ============ data actions ============ */
 function csvExport(){
-  const head = ['狀態','幣種','方向','槓桿','倉位價值','數量','開倉價','平倉價','止損','止盈','開倉手續費','平倉手續費','資金費','費用合計','毛盈虧','淨盈虧','保證金報酬率','R倍數','開倉時間','平倉時間','平台','策略','週期','情緒','評分','錯誤標籤','違規','清單完成率','進場計畫','復盤','保證金模式','強平價','平倉明細','TP計畫'];
+  const head = ['狀態','幣種','方向','槓桿','倉位價值','數量','開倉價','平倉價','止損','止盈','開倉手續費','平倉手續費','資金費','費用合計','毛盈虧','淨盈虧','保證金報酬率','R倍數','開倉時間','平倉時間','平台','策略','週期','情緒','評分','錯誤標籤','違規','清單完成率','進場計畫','復盤','保證金模式','強平價','平倉明細','TP計畫','系統推算淨盈虧','實際盈虧(手填)','圖表連結'];
   const q = v => { const s = String(v ?? ''); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const tx = v => { const s = String(v ?? ''); return /^[=+\-@\t\r]/.test(s) ? "'" + s : s; };
   const r = (n, d = 4) => n == null ? '' : +n.toFixed(d);
   const rows = [...S.trades].sort((a, b) => a.openAt < b.openAt ? -1 : 1).map(t => { const d = S.D[t.id];
-    return [t.exit == null ? '持倉中' : '已平倉', tx(t.coin), t.dir, t.lev, t.notional, r(d.size, 6), t.entry, t.exit ?? '', t.sl ?? '', t.tp ?? '', t.feeOpen, t.feeClose, t.funding, t.fees, r(d.gross, 4), r(d.net, 4), r(d.roi, 4), r(d.R, 3), t.openAt, t.closeAt ?? '', tx(t.exchange), tx(t.strategy), t.tf, t.emotion, t.rating || '', tx(t.mistakes.join('|')), tx(d.viol.map(v => v.msg).join('|')), d.chk != null ? r(d.chk, 2) : '', tx(t.notes), tx(t.review), MODES[t.mode] || '全倉', r(d.liq, 6), tx(t.closes.map(c => c.price + 'x' + c.pct + '%').join('|')), tx(t.tps.map(x => x.price + 'x' + x.pct + '%').join('|'))].map(q).join(','); });
+    return [t.exit == null ? '持倉中' : '已平倉', tx(t.coin), t.dir, t.lev, t.notional, r(d.size, 6), t.entry, t.exit ?? '', t.sl ?? '', t.tp ?? '', t.feeOpen, t.feeClose, t.funding, t.fees, r(d.gross, 4), r(d.net, 4), r(d.roi, 4), r(d.R, 3), t.openAt, t.closeAt ?? '', tx(t.exchange), tx(t.strategy), t.tf, t.emotion, t.rating || '', tx(t.mistakes.join('|')), tx(d.viol.map(v => v.msg).join('|')), d.chk != null ? r(d.chk, 2) : '', tx(t.notes), tx(t.review), MODES[t.mode] || '全倉', r(d.liq, 6), tx(t.closes.map(c => c.price + 'x' + c.pct + '%').join('|')), tx(t.tps.map(x => x.price + 'x' + x.pct + '%').join('|')), r(d.sysNet, 4), t.actual ?? '', tx(t.chartUrl)].map(q).join(','); });
   download('\ufeff' + head.join(',') + '\r\n' + rows.join('\r\n'), `trades-${today()}.csv`, 'text/csv;charset=utf-8');
   toast('已匯出 CSV');
 }
@@ -998,7 +1006,7 @@ function demoTrades(){
 const ACT = {
   new:() => S.view === 'grid' ? openGridForm() : openForm(), gedit:(el, id) => openGridForm(id),
   gdel:async (el, id) => { if (!(await confirmBox('刪除這個網格紀錄？', '刪除後無法復原。', '刪除', true))) return; S.grids = S.grids.filter(x => x.id !== id); await saveGrids(); render(); toast('已刪除'); }, close:() => closeModal(), view:(el, id) => openDetail(id), edit:(el, id) => { openForm(id); },
-  dup:(el, id) => { const t = S.trades.find(x => x.id === id); openForm(null, {...t, id:null, exit:null, closeAt:null, closes:[], openAt:nowLocal(), review:'', shot:null, mistakes:[], checks:[], rating:0, fees:0, feeOpen:0, feeClose:0, funding:0, demo:false}); },
+  dup:(el, id) => { const t = S.trades.find(x => x.id === id); openForm(null, {...t, id:null, exit:null, closeAt:null, closes:[], actual:null, openAt:nowLocal(), review:'', shot:null, mistakes:[], checks:[], rating:0, fees:0, feeOpen:0, feeClose:0, funding:0, demo:false}); },
   del:async (el, id) => {
     if (!(await confirmBox('刪除這筆交易？', '刪除後無法復原。', '刪除', true))) return;
     S.trades = S.trades.filter(x => x.id !== id); await persist(() => IDB.del(id)); recompute(); closeModal(); render(); toast('已刪除');
@@ -1027,7 +1035,7 @@ const ACT = {
   google:async () => { try { await FB.A.signInWithPopup(FB.auth, new FB.A.GoogleAuthProvider()); closeModal(); toast('登入成功，正在同步'); } catch (e) { const el = $('#aerr'); if (el) el.textContent = authMsg(e); } },
   reset:async () => { const em = $('#a_email').value.trim(); if (!em) { $('#aerr').textContent = '請先輸入 Email'; return; } try { await FB.A.sendPasswordResetEmail(FB.auth, em); toast('已寄出重設密碼信'); } catch (e) { $('#aerr').textContent = authMsg(e); } },
   logout:async () => {
-    if (!(await confirmBox('登出並清除本機資料？', '資料已保存在雲端，登入後會自動還原。登出會清除這台裝置上的本機副本，避免他人在共用電腦看到。', '登出', true))) return;
+    if (!(await confirmBox('登出並清除本機資料？', '交易與設定已保存在雲端，登入後會自動還原。登出會清除這台裝置上的本機副本。注意：截圖只存在這台裝置、不會同步，登出後會一併消失，請先匯出 JSON 備份。', '登出', true))) return;
     clearTimeout(FB.t); await cloudFlush();
     if (FB.status === 'error') { toast('尚有資料未同步成功，請連線正常後再登出'); return; }
     closeModal(); await FB.A.signOut(FB.auth);
@@ -1124,7 +1132,7 @@ const FIREBASE_CONFIG = {
 const FBV = 'https://www.gstatic.com/firebasejs/11.6.1/';
 const FB = {ready:false, failed:false, user:null, status:'off', detail:'', sig:{trades:{}, grids:{}, settings:undefined}, unsubs:[], mode:'signin', settingsReady:false, busy:false, dirty:false, t:null};
 const SIGS = new WeakMap();
-const sigOf = o => { let s = SIGS.get(o); if (s === undefined) { s = JSON.stringify(o); SIGS.set(o, s); } return s; };
+const sigOf = o => { let s = SIGS.get(o); if (s === undefined) { s = JSON.stringify({...o, shot:null}); SIGS.set(o, s); } return s; };
 function setSync(st, detail){ FB.status = st; FB.detail = detail || ''; chromeCloud(); }
 function chromeCloud(){
   const b = $('#cloudBtn'); if (!b) return;
@@ -1174,6 +1182,7 @@ function applyRemote(kind, snap){
       if (ls === rs) { known[id] = rs; return; }
       if (known[id] !== undefined ? ls !== known[id] : (loc.updatedAt || 0) > (r.updatedAt || 0)) return;
     }
+    if (kind === 'trades') r.shot = (loc && loc.shot) ? loc.shot : r.shot;
     if (i >= 0) arr[i] = r; else arr.push(r);
     known[id] = sigOf(r); put.push(r);
   });
@@ -1209,7 +1218,7 @@ async function cloudFlush(){
     for (let i = 0; i < ops.length; i += 20) {
       if (!FB.user || FB.user.uid !== uid) break;
       const ch = ops.slice(i, i + 20), b = F.writeBatch(FB.db);
-      ch.forEach(op => { const ref = F.doc(FB.db, 'users', uid, op.k, op.id); if (op.del) b.delete(ref); else b.set(ref, op.o); });
+      ch.forEach(op => { const ref = F.doc(FB.db, 'users', uid, op.k, op.id); if (op.del) b.delete(ref); else b.set(ref, op.k === 'trades' ? {...op.o, shot:null} : op.o); });
       await b.commit();
       ch.forEach(op => { if (op.del) delete FB.sig[op.k][op.id]; else FB.sig[op.k][op.id] = op.s; });
     }
@@ -1242,7 +1251,7 @@ function openCloud(){
   if (!FB.ready) { openModal(`<div class="dlg sm"><h3>雲端服務尚未連線</h3><p>${FB.failed ? '無法載入 Firebase，請確認網路後重新整理頁面。' : '正在連線，請稍候再試。'}</p><div class="row"><button class="btn" data-act="close">關閉</button></div></div>`); return; }
   if (!FB.user) { openModal(authHTML()); return; }
   const st = {syncing:'同步中…', ok:'已同步', error:'同步失敗' + (FB.detail ? `（${FB.detail}）` : ''), off:'未連線'}[FB.status];
-  openModal(`<div class="dlg sm" style="max-width:440px"><h3>雲端同步</h3><p>已登入：<b>${esc(FB.user.email || '（Google 帳號）')}</b><br>狀態：${esc(st)}</p>
+  openModal(`<div class="dlg sm" style="max-width:440px"><h3>雲端同步</h3><p>已登入：<b>${esc(FB.user.email || '（Google 帳號）')}</b><br>狀態：${esc(st)}</p><p class="muted" style="font-size:12.5px">截圖只存在這台裝置，不會同步到雲端；跨裝置請改用「圖表連結」。</p>
   ${FB.detail === 'permission-denied' ? '<p class="neg">權限不足：請先在 Firebase 後台發布 Firestore 安全規則。</p>' : ''}
   <div class="row"><button class="btn" data-act="close">關閉</button><button class="btn" data-act="syncnow">立即同步</button><button class="btn danger" data-act="logout">登出</button></div></div>`);
 }
